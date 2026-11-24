@@ -1,0 +1,33 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  solver-api:
+    build:
+      context: ../..
+      dockerfile: apps/solver-server/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      - EVRAKPLUS_SOLVER_TOKEN=${EVRAKPLUS_SOLVER_TOKEN:-CHANGE_ME_IN_PRODUCTION}
+      - EVRAKPLUS_MAX_WORKERS=2
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 4G
+
+volumes:
+  redis_data:
