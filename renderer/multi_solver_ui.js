@@ -35,6 +35,7 @@
     customTimeSec: 90,
     performanceMode: 'balanced', // low | balanced | high
     minizincBackend: 'gecode', // gecode | chuffed
+    sameTeacherClassMultiCourseMode: 'soft', // soft | hard | off
     allowBlockAlternatives: false,
     health: null,
     lastCandidates: [],
@@ -58,6 +59,7 @@
       time_limit_sec: getTimeLimitSec(),
       performance_mode: multiState.performanceMode,
       minizinc_backend: multiState.minizincBackend,
+      same_teacher_class_multi_course_mode: multiState.sameTeacherClassMultiCourseMode,
       allow_block_alternatives: Boolean(multiState.allowBlockAlternatives),
       enable_multipass: true
     };
@@ -265,10 +267,20 @@
           </label>
         </div>
 
-        <label class="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-          <input id="msAllowBlockAlt" type="checkbox" ${multiState.allowBlockAlternatives ? 'checked' : ''} class="rounded border-slate-300 text-indigo-600" />
-          <span>Multi-Pass PASS 2: Kesin çözüm çıkmazsa uzun blokları (3-4 saat) alternatif alt bloklara bölmeme izin ver (izinsiz asla bölünmez)</span>
-        </label>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 pt-1">
+          <label class="block text-xs font-semibold text-slate-700 rounded-xl border border-indigo-100 bg-indigo-50/40 p-2.5">
+            Aynı Öğretmen + Aynı Sınıf Farklı Ders Kuralı (Kendi Branşı + Branş Dışı)
+            <select id="msTcMultiCourseSelect" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium">
+              <option value="soft" ${multiState.sameTeacherClassMultiCourseMode === 'soft' ? 'selected' : ''}>Ayrı günlere yay (Önerilen — öğretmen ve sınıfı yormaz)</option>
+              <option value="hard" ${multiState.sameTeacherClassMultiCourseMode === 'hard' ? 'selected' : ''}>Aynı gün kesinlikle yasak (Sert kural)</option>
+              <option value="off" ${multiState.sameTeacherClassMultiCourseMode === 'off' ? 'selected' : ''}>Kapalı (Aynı gün girebilir)</option>
+            </select>
+          </label>
+          <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer rounded-xl border border-slate-200 bg-slate-50/60 p-2.5">
+            <input id="msAllowBlockAlt" type="checkbox" ${multiState.allowBlockAlternatives ? 'checked' : ''} class="rounded border-slate-300 text-indigo-600 shrink-0" />
+            <span>Multi-Pass PASS 2: Kesin çözüm çıkmazsa uzun blokları (3-4 saat) alternatif alt bloklara bölmeme izin ver (izinsiz asla bölünmez)</span>
+          </label>
+        </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           ${cardsHtml}
@@ -296,6 +308,9 @@
 
     const mznSel = document.getElementById('msMznBackend');
     if (mznSel) mznSel.addEventListener('change', (e) => { multiState.minizincBackend = e.target.value; });
+
+    const tcMultiSel = document.getElementById('msTcMultiCourseSelect');
+    if (tcMultiSel) tcMultiSel.addEventListener('change', (e) => { multiState.sameTeacherClassMultiCourseMode = e.target.value; });
 
     const blkChk = document.getElementById('msAllowBlockAlt');
     if (blkChk) blkChk.addEventListener('change', (e) => { multiState.allowBlockAlternatives = Boolean(e.target.checked); });

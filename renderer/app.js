@@ -2790,7 +2790,7 @@ const REQUIRED_SOLVER = 'google_ortools_cp_sat';
 
 function setSolverUiRunning(running, phaseMessage) {
   solverRunning = running;
-  for (const id of ['btnM5RunSolver', 'btnM5RestartSolver', 'btnM5PlaceUnplaced']) {
+  for (const id of ['btnM5RunSolver', 'btnM5MaximizeSolve', 'btnM5RestartSolver', 'btnM5PlaceUnplaced']) {
     const b = document.getElementById(id);
     if (b) b.disabled = running;
   }
@@ -3164,7 +3164,14 @@ async function startOrToolsSolver(keepPinned = true, onlyUnplaced = false, scope
   let showPreview = Boolean(scopeOpts && scopeOpts.preview);
   let previewLabel = 'Otomatik Dağıtım Önerisi';
 
-  if (scopeOpts && scopeOpts.mode === 'repair_min_changes') {
+  if (scopeOpts && scopeOpts.mode === 'maximize_placement') {
+    mode = 'maximize_placement';
+    cfg.fixed_assignments = keepPinned
+      ? oldPlacements.filter((pl) =>
+          state.pinnedPlacementIds.includes(getPlacementKey(pl)) ||
+          (pl.teacher_ids || []).some((tid) => state.lockedTeacherIds.includes(tid)))
+      : [];
+  } else if (scopeOpts && scopeOpts.mode === 'repair_min_changes') {
     mode = 'repair_min_changes';
     showPreview = true;
     previewLabel = 'En Az Değişiklikle Onarım';
@@ -3246,7 +3253,26 @@ async function startOrToolsSolver(keepPinned = true, onlyUnplaced = false, scope
       throw new Error('Dağıtım motoru geçersiz durum döndürdü.');
     }
 
-    if (result.status === 'OPTIMAL' || result.status === 'FEASIBLE') {
+    if (result.status === 'PARTIAL' && Array.isArray(result.placements) && result.placements.length > 0) {
+      editorHistory.push(state);
+      state.solution = result;
+      state.lastSolveError = {
+        status: 'PARTIAL',
+        solve_time_sec: result.solve_time_sec || 0,
+        message: result.message || `${result.placed_blocks}/${result.total_blocks} blok yerleştirildi; yerleşemeyen derslerin nedenleri ve çözüm bağlantıları aşağıda.`,
+        diagnostics: result.diagnostics || (result.unplaced || []).map((u) => ({
+          code: 'UNPLACED_BLOCK',
+          category: 'Yerleşmeyen Ders',
+          message: u.reason || `${u.class_name || ''} - ${u.course_name || ''} yerleşemedi.`,
+          nav: u.nav,
+          linkLabel: u.linkLabel,
+          links: u.links || []
+        }))
+      };
+      saveState();
+      updateUndoRedoButtons();
+      showToast(`Maksimumda dağıtım: ${result.placed_blocks}/${result.total_blocks} blok yerleşti (${(result.unplaced || []).length} blok inceleme bekliyor).`);
+    } else if (result.status === 'OPTIMAL' || result.status === 'FEASIBLE') {
       const expectedTotal = cfg.assignments.reduce((sum, a) => sum + a.blocks.length, 0);
       if (result.total_blocks !== expectedTotal || result.placements.length !== expectedTotal || result.placed_blocks !== expectedTotal) {
         throw new Error('Gelen çözüm ile modelin blok sayısı uyuşmuyor.');
@@ -5572,6 +5598,8 @@ function bindEvents() {
   // Menü 5
   document.getElementById('m5Preference').addEventListener('change', (e) => { state.distributionPreference = e.target.value; saveState(); });
   document.getElementById('btnM5RunSolver').addEventListener('click', () => startOrToolsSolver(true, false));
+  const btnMax = document.getElementById('btnM5MaximizeSolve');
+  if (btnMax) btnMax.addEventListener('click', () => startOrToolsSolver(true, false, { mode: 'maximize_placement' }));
   document.getElementById('btnM5StopSolver').addEventListener('click', () => stopOrToolsSolver(true));
   document.getElementById('btnM5RestartSolver').addEventListener('click', () => { if (solverRunning) stopOrToolsSolver(false); startOrToolsSolver(false, false); });
   document.getElementById('btnM5PlaceUnplaced').addEventListener('click', placeUnplacedBlocks);

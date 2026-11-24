@@ -181,3 +181,68 @@ def test_invalid_schedule_never_beats_valid_schedule():
     }
     ranked = compare_solutions([invalid_high_soft, valid_candidate])
     assert ranked[0]["engine_key"] == "ortools"
+
+
+def test_same_teacher_same_class_multi_course_rule_hard():
+    cfg = make_sample_school_config(num_classes=1, num_teachers=1)
+    # Aynı öğretmen 5/A sınıfına hem Matematik (kendi branşı) hem Bilişim (branş dışı) giriyor
+    cfg["assignments"] = [
+        {
+            "assignment_id": "a_mat", "class_id": "c1", "class_name": "5/A",
+            "course_id": "mat", "course_name": "Matematik", "teacher_ids": ["t1"],
+            "hours": 4, "blocks": [2, 2], "max_blocks_per_day": 1,
+            "room_type": "standard", "room_id": None, "use_common_elective_slot": False,
+        },
+        {
+            "assignment_id": "a_bil", "class_id": "c1", "class_name": "5/A",
+            "course_id": "bil", "course_name": "Bilişim (Branş Dışı)", "teacher_ids": ["t1"],
+            "hours": 4, "blocks": [2, 2], "max_blocks_per_day": 1,
+            "room_type": "standard", "room_id": None, "use_common_elective_slot": False,
+        },
+    ]
+    cfg["fixed_assignments"] = []
+    cfg["solution_request"] = {
+        "preference": "balanced",
+        "time_limit_sec": 10,
+        "multi_mode": "single",
+        "engines": ["ortools"],
+        "same_teacher_class_multi_course_mode": "hard",
+    }
+    res = run_multi_solver(cfg)
+    assert res["status"] in ("OPTIMAL", "FEASIBLE")
+    assert res["validation"]["valid"] is True
+    mat_days = {p["day_index"] for p in res["placements"] if p["assignment_id"] == "a_mat"}
+    bil_days = {p["day_index"] for p in res["placements"] if p["assignment_id"] == "a_bil"}
+    assert mat_days.isdisjoint(bil_days), f"Aynı gün hem Matematik hem Bilişim konmuş: {mat_days} vs {bil_days}"
+
+
+def test_maximize_placement_mode_with_root_cause_and_nav_links():
+    cfg = make_sample_school_config(num_classes=1, num_teachers=1)
+    # Öğretmen sadece Pazartesi 1-2. ders açık (2 saat), ama 2 ayrı 2'şer saatlik blok (4 saat) atanmış -> 1 blok yerleşir, 1 blok yerleşemez!
+    unavail = [{"day_index": d, "period": p} for d in range(5) for p in range(1, 7) if not (d == 0 and p in (1, 2))]
+    cfg["teachers"][0]["unavailable_slots"] = unavail
+    cfg["assignments"] = [
+        {
+            "assignment_id": "a_ok", "class_id": "c1", "class_name": "5/A",
+            "course_id": "mat", "course_name": "Matematik", "teacher_ids": ["t1"],
+            "hours": 4, "blocks": [2, 2], "max_blocks_per_day": 2,
+            "room_type": "standard", "room_id": None, "use_common_elective_slot": False,
+        },
+    ]
+    cfg["fixed_assignments"] = []
+    cfg["solution_request"] = {
+        "mode": "maximize_placement",
+        "preference": "balanced",
+        "time_limit_sec": 10,
+        "multi_mode": "single",
+        "engines": ["ortools"],
+    }
+    res = run_multi_solver(cfg)
+    assert res["status"] == "PARTIAL"
+    assert res["placed_blocks"] == 1
+    assert res["total_blocks"] == 2
+    assert res["validation"]["valid"] is True
+    assert len(res["unplaced"]) == 1
+    assert res["unplaced"][0].get("nav") is not None
+    assert "Çözüm önerisi" in res["unplaced"][0]["reason"]
+

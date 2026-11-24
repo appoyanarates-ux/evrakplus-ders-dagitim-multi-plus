@@ -127,7 +127,8 @@ def _run_single_engine(
         if engine_key == "ortools":
             res = solve_ortools_core(cfg)
             res["engine_version"] = f"Google OR-Tools {ortools.__version__}"
-            val = validate_result(cfg, res)
+            is_max = str((cfg.get("solution_request") or {}).get("mode") or "") == "maximize_placement"
+            val = validate_result(cfg, res, allow_partial=is_max)
             res["validation"] = val
             res["quality"] = score_schedule(cfg, res, val)
         elif engine_key == "timefold":
@@ -286,11 +287,19 @@ def run_multi_solver(config: Dict[str, Any]) -> Dict[str, Any]:
 
     pass_log: List[Dict[str, Any]] = []
 
+    # Maksimumda Bitir (maximize_placement) modu doğrudan OR-Tools CP-SAT opsiyonel yerleştirme motorunu kullanır
+    if str(req.get("mode") or "") == "maximize_placement":
+        mode = "single"
+        selected_engines = ["ortools"]
+
     # PASS 0: Veri ve kapasite ön kontrolü
+    is_maximize = str(req.get("mode") or "") == "maximize_placement"
     emit_event({"type": "pass", "pass": 0, "message": "PASS 0: Veri ve kapasite ön kontrolü yapılıyor"})
     pre = validate_model(config)
-    pass_log.append({"pass": "PASS 0", "description": "Veri ve kapasite ön kontrolü", "valid": pre["valid"], "errors": len(pre["errors"])})
-    if not pre["valid"]:
+    fatal_in_max = {"INVALID_GRID", "NO_ASSIGNMENTS", "MISSING_CLASS", "NO_TEACHER_ASSIGNED", "BLOCK_SUM_MISMATCH", "DUPLICATE_FIXED_BLOCK"}
+    blocking_errors = [e for e in (pre.get("errors") or []) if (not is_maximize) or (e.get("code") in fatal_in_max)]
+    pass_log.append({"pass": "PASS 0", "description": "Veri ve kapasite ön kontrolü", "valid": len(blocking_errors) == 0, "errors": len(blocking_errors)})
+    if blocking_errors:
         return {
             "orchestrator": "EvrakPlus Multi Solver Optimization Engine",
             "mode": mode,
@@ -301,7 +310,7 @@ def run_multi_solver(config: Dict[str, Any]) -> Dict[str, Any]:
             "total_blocks": int((pre.get("summary") or {}).get("total_blocks") or 0),
             "placements": [],
             "unplaced": [],
-            "diagnostics": pre["errors"],
+            "diagnostics": blocking_errors,
             "warnings": pre["warnings"],
             "candidates": [],
             "pass_log": pass_log,

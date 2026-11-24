@@ -837,7 +837,10 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
         for asgn in config.get("assignments") or []:
             total_blocks += len(asgn.get("blocks") or [])
 
-    if not validation["valid"]:
+    is_max_mode_early = str((config.get("solution_request") or {}).get("mode") or "") == "maximize_placement"
+    fatal_in_max = {"INVALID_GRID", "NO_ASSIGNMENTS", "MISSING_CLASS", "NO_TEACHER_ASSIGNED", "BLOCK_SUM_MISMATCH", "DUPLICATE_FIXED_BLOCK"}
+    blocking_val_errors = [e for e in (validation.get("errors") or []) if (not is_max_mode_early) or (e.get("code") in fatal_in_max)]
+    if blocking_val_errors:
         unplaced = []
         for asgn in config.get("assignments") or []:
             for b_idx, blen in enumerate(asgn.get("blocks") or []):
@@ -930,6 +933,7 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
     travel_min = int(school_cfg.get("building_travel_minutes") or 0)
 
     objective_terms: List[cp_model.LinearExpr] = []
+    pre_unplaced_diags: List[Tuple[Tuple[str, int], Dict[str, Any]]] = []
 
     for asgn in assignments:
         aid = asgn["assignment_id"]
@@ -973,15 +977,32 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
                     teacher_unavail_sets=t_unavails,
                 )
 
-            # Kesin kural: hiç uygun aday yoksa sessiz atlama YOK -> INFEASIBLE
+            # Kesin kural: normal modda hiç uygun aday yoksa sessiz atlama YOK -> INFEASIBLE
+            # Maksimumda Bitir (maximize_placement) modunda bu blok yerleşemeyen olarak raporlanır, diğerleri yerleştirilir.
+            is_maximize_mode = str(sol_req.get("mode") or "") == "maximize_placement"
             if not valid_starts:
-                links: List[Dict[str, Any]] = [{"nav": {"view": "menu2", "classId": cid}, "label": f"{asgn.get('class_name')} Bloklarına Git →"}]
+                links: List[Dict[str, Any]] = [
+                    {"nav": {"view": "menu2", "classId": cid}, "label": f"{asgn.get('class_name')} Bloklarına Git →"},
+                    {"nav": {"view": "menu4", "classId": cid, "search": asgn.get("course_name") or ""}, "label": f"{asgn.get('class_name')} Ders Atamasına Git →"},
+                ]
                 primary_nav: Dict[str, Any] = {"view": "menu4", "classId": cid, "search": asgn.get("course_name") or ""}
                 primary_label = f"{asgn.get('class_name')} Dersine Git →"
                 if t_ids and t_ids[0] in teacher_map:
                     t0_name = teacher_map[t_ids[0]].get("name", t_ids[0])
                     primary_nav = {"view": "menu3", "teacherId": t_ids[0]}
                     primary_label = f"{t0_name} Kapalı Saatlerine Git →"
+                diag_entry = {
+                    "code": "NO_VALID_START",
+                    "category": "Uygun Saat Bulunamadı",
+                    "message": f"{asgn.get('class_name')} - {asgn.get('course_name')} ({blen} sa blok) yerleştirilemiyor: Öğretmen kapalı saatleri, öğle arası veya okul kapalı saatleri nedeniyle uygun aralık yok. Öneri: Öğretmenin kapalı saatlerini açın veya blok uzunluğunu küçültün.",
+                    "nav": primary_nav,
+                    "linkLabel": primary_label,
+                    "links": links,
+                }
+                if is_maximize_mode and key not in resolved_fixed:
+                    block_candidates[key] = []
+                    pre_unplaced_diags.append((key, diag_entry))
+                    continue
                 return {
                     "engine": ENGINE_NAME,
                     "status": "INFEASIBLE",
@@ -990,14 +1011,7 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
                     "total_blocks": total_blocks,
                     "placements": [],
                     "unplaced": [],
-                    "diagnostics": [{
-                        "code": "NO_VALID_START",
-                        "category": "Uygun Saat Bulunamadı",
-                        "message": f"{asgn.get('class_name')} {asgn.get('course_name')} dersi için {blen} saatlik blok yerleştirilemiyor. Uygun açık ders saati bulunmuyor.",
-                        "nav": primary_nav,
-                        "linkLabel": primary_label,
-                        "links": links,
-                    }],
+                    "diagnostics": [diag_entry],
                     "message": f"{asgn.get('class_name')} - {asgn.get('course_name')} dersi için uygun zaman bulunamadı.",
                 }
 
@@ -1036,11 +1050,17 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
                     room_type_day_vars[(room_type, d)].append((span_s, span_e, var, blen))
 
             block_candidates[key] = cands
-            # Kural 1: Her blok tam bir kez yerleşir
-            model.AddExactlyOne([v for _, _, v in cands])
+            # Kural 1: Normal modda her blok tam 1 kez yerleşir; Maksimumda Bitir modunda kilitli olmayan bloklar isteğe bağlı + çok yüksek ödüllüdür
+            if is_maximize_mode and key not in resolved_fixed:
+                model.AddAtMostOne([v for _, _, v in cands])
+                unplaced_v = model.NewBoolVar(f"unpl_{aid}_{b_idx}")
+                model.Add(sum(v for _, _, v in cands) + unplaced_v == 1)
+                objective_terms.append((10000 * blen) * unplaced_v)
+            else:
+                model.AddExactlyOne([v for _, _, v in cands])
 
-        # Aynı uzunlukta ve sabitlenmemiş ardışık bloklar arasında simetri kırma
-        if len(blocks) > 1:
+        # Aynı uzunlukta ve sabitlenmemiş ardışık bloklar arasında simetri kırma (maximize_placement dışında)
+        if len(blocks) > 1 and str(sol_req.get("mode") or "") != "maximize_placement":
             for b_idx in range(len(blocks) - 1):
                 k1 = (aid, b_idx)
                 k2 = (aid, b_idx + 1)
@@ -1243,6 +1263,40 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
                     if ref_vars or oth_vars:
                         model.Add(sum(ref_vars) == sum(oth_vars))
 
+    # Kural 9c (Pedagojik Kural): Aynı öğretmen aynı sınıfa aynı gün birden fazla FARKLI dersle (kendi branşı + branş dışı/ek ders) girmesin
+    tc_multi_mode = str(
+        sol_req.get("same_teacher_class_multi_course_mode")
+        or (config.get("school") or {}).get("same_teacher_class_multi_course_mode")
+        or "soft"
+    ).lower()
+    if tc_multi_mode in ("soft", "hard"):
+        tc_assignments: Dict[Tuple[str, str], List[str]] = defaultdict(list)
+        for asgn in assignments:
+            cid_k = asgn["class_id"]
+            aid_k = asgn["assignment_id"]
+            for tid_k in (asgn.get("teacher_ids") or []):
+                tc_assignments[(tid_k, cid_k)].append(aid_k)
+        for (tid_k, cid_k), aids_list in tc_assignments.items():
+            # Yalnızca aynı öğretmen aynı sınıfta 2+ farklı derse giriyorsa uygula
+            if len(aids_list) < 2:
+                continue
+            for d in range(num_days):
+                course_day_flags: List[cp_model.IntVar] = []
+                for aid_k in aids_list:
+                    avars = asgn_day_vars.get((aid_k, d)) or []
+                    if not avars:
+                        continue
+                    flag = model.NewBoolVar(f"tcm_{tid_k}_{cid_k}_{aid_k}_{d}")
+                    model.AddMaxEquality(flag, avars)
+                    course_day_flags.append(flag)
+                if len(course_day_flags) >= 2:
+                    if tc_multi_mode == "hard":
+                        model.Add(sum(course_day_flags) <= 1)
+                    else:
+                        excess = model.NewIntVar(0, len(course_day_flags) - 1, f"tcm_ex_{tid_k}_{cid_k}_{d}")
+                        model.Add(excess >= sum(course_day_flags) - 1)
+                        objective_terms.append(35 * excess)
+
     # Kural 12 (Aşama 3): En Az Değişiklikle Onarma (repair_min_changes)
     req_mode = str(sol_req.get("mode") or "full_solve")
     prev_placements_raw = (
@@ -1388,12 +1442,23 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
     # SONUÇ ÇIKARIMI VE BAĞIMSIZ DOĞRULAMA
     # =========================================================================
     emit_progress("verifying", "Doğrulanıyor")
+    is_maximize_mode = req_mode == "maximize_placement"
     placements: List[Dict[str, Any]] = []
+    unplaced_items: List[Dict[str, Any]] = []
+    unplaced_diags: List[Dict[str, Any]] = []
+    pre_unplaced_map = {k: d for k, d in pre_unplaced_diags}
+
+    # Yerleşen öğretmen/şube/derslik saatlerini analiz için topla
+    placed_teacher_slots: Dict[str, Set[Tuple[int, int]]] = defaultdict(set)
+    placed_class_slots: Dict[str, Set[Tuple[int, int]]] = defaultdict(set)
+
     for (aid, b_idx), cands in block_candidates.items():
         asgn = assignments_by_id[aid]
         blen = block_meta[(aid, b_idx)]["length"]
+        found = False
         for d, p, var in cands:
             if solver.BooleanValue(var):
+                found = True
                 placements.append({
                     "block_id": f"{aid}__b{b_idx}",
                     "assignment_id": aid,
@@ -1409,26 +1474,111 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
                     "start_period": p,
                     "length": blen,
                 })
+                for k in range(blen):
+                    placed_class_slots[asgn["class_id"]].add((d, p + k))
+                    for tid in (asgn.get("teacher_ids") or []):
+                        placed_teacher_slots[tid].add((d, p + k))
                 break
+        if not found:
+            cid = asgn["class_id"]
+            cname = asgn.get("class_name") or cid
+            crs_name = asgn.get("course_name") or asgn.get("course_id") or "Ders"
+            t_ids = list(asgn.get("teacher_ids") or [])
+            t_names = [teacher_map[tid].get("name", tid) for tid in t_ids if tid in teacher_map]
+            t_label = ", ".join(t_names) if t_names else "Öğretmen atanmamış"
+
+            if (aid, b_idx) in pre_unplaced_map:
+                diag = pre_unplaced_map[(aid, b_idx)]
+                reason = diag["message"]
+            else:
+                # Kök neden ve çözüm önerisi analizi
+                reasons: List[str] = []
+                suggestions: List[str] = []
+                links_list: List[Dict[str, Any]] = [
+                    {"nav": {"view": "menu2", "classId": cid}, "label": f"{cname} Bloklarına Git →"},
+                    {"nav": {"view": "menu4", "classId": cid, "search": crs_name}, "label": f"{cname} Ders Atamasına Git →"},
+                ]
+                primary_nav: Dict[str, Any] = {"view": "menu4", "classId": cid, "search": crs_name}
+                primary_label = f"{cname} Ders Atamasına Git →"
+
+                # 1. Öğretmen kapalı/dolu saat analizi
+                for tid in t_ids:
+                    if tid not in teacher_map:
+                        continue
+                    t_obj = teacher_map[tid]
+                    t_name = t_obj.get("name", tid)
+                    unavail_cnt = len(teacher_unavail.get(tid, set()))
+                    open_total = max(0, (num_days * periods_per_day) - len(blocked) - unavail_cnt)
+                    used_cnt = len(placed_teacher_slots.get(tid, set()))
+                    free_cnt = max(0, open_total - used_cnt)
+                    if free_cnt < blen or unavail_cnt >= periods_per_day:
+                        reasons.append(f"{t_name} öğretmeninin açık saatleri yetersiz (kapalı: {unavail_cnt} sa, kalan boş: {free_cnt} sa)")
+                        suggestions.append(f"{t_name} için kapalı saatlerden en az {blen} saat açın veya günlük üst sınırı artırın")
+                        primary_nav = {"view": "menu3", "teacherId": tid}
+                        primary_label = f"{t_name} Müsaitliğine Git →"
+                        links_list.insert(0, {"nav": {"view": "menu3", "teacherId": tid}, "label": f"{t_name} Müsaitliğine Git →"})
+
+                # 2. Özel derslik analizi
+                rtype = asgn.get("room_type") or "standard"
+                if rtype != "standard" or asgn.get("room_id"):
+                    reasons.append(f"Özel mekan/derslik ({rtype}) uygun saatlerde dolu")
+                    suggestions.append("Özel mekan eşzamanlı kapasitesini artırın veya farklı derslik atayın")
+                    links_list.append({"nav": {"view": "menu4", "focus": "rooms"}, "label": "Dersliklere Git →"})
+
+                # 3. Şube boşluk / blok uyumu
+                if not reasons:
+                    reasons.append(f"{cname} şubesi ile {t_label} öğretmeninin {blen} saatlik ortak boş bloğu çakışma nedeniyle bulunamadı")
+                    suggestions.append(f"{blen} saatlik bloğu daha küçük parçalara (ör. 1+1) bölün veya öğretmen kapalı saatlerini esnetin")
+
+                reason = f"{cname} - {crs_name} ({blen} sa blok, {t_label}): " + "; ".join(reasons) + ". Çözüm önerisi: " + "; ".join(suggestions) + "."
+                diag = {
+                    "code": "UNPLACED_BLOCK",
+                    "category": "Yerleşmeyen Ders Analizi",
+                    "message": reason,
+                    "nav": primary_nav,
+                    "linkLabel": primary_label,
+                    "links": links_list[:3],
+                }
+            unplaced_items.append({
+                "block_id": f"{aid}__b{b_idx}",
+                "assignment_id": aid,
+                "block_index": b_idx,
+                "class_id": cid,
+                "class_name": cname,
+                "course_id": asgn.get("course_id", ""),
+                "course_name": crs_name,
+                "teacher_ids": t_ids,
+                "length": blen,
+                "reason": reason,
+                "nav": diag.get("nav"),
+                "linkLabel": diag.get("linkLabel"),
+                "links": diag.get("links") or [],
+            })
+            unplaced_diags.append(diag)
 
     # Özel derslik türü havuzu olan derslere çakışmasız somut room_id ata
     assign_pool_rooms(placements, assignments_by_id, rooms_by_type, class_map, intervals)
 
     placements.sort(key=lambda item: (item["class_id"], item["day_index"], item["start_period"], item["block_index"]))
 
+    final_status = "PARTIAL" if (is_maximize_mode and len(unplaced_items) > 0 and len(placements) > 0) else status_name
     result = {
         "engine": ENGINE_NAME,
-        "status": status_name,
+        "status": final_status,
         "solve_time_sec": round(time.perf_counter() - t0, 3),
         "placed_blocks": len(placements),
         "total_blocks": total_blocks,
         "placements": placements,
-        "unplaced": [],
-        "diagnostics": [],
-        "message": f"OR-Tools CP-SAT dağıtımı tamamlandı ({len(placements)}/{total_blocks} blok).",
+        "unplaced": unplaced_items,
+        "diagnostics": unplaced_diags,
+        "message": (
+            f"Maksimumda dağıtım tamamlandı: {len(placements)}/{total_blocks} blok yerleştirildi, {len(unplaced_items)} blok yerleşemedi (nedenleri ve çözüm bağlantıları aşağıda)."
+            if unplaced_items
+            else f"OR-Tools CP-SAT dağıtımı tamamlandı ({len(placements)}/{total_blocks} blok)."
+        ),
     }
 
-    verification = validate_result(config, result)
+    verification = validate_result(config, result, allow_partial=is_maximize_mode)
     if not verification["valid"]:
         return {
             "engine": ENGINE_NAME,
@@ -1437,7 +1587,7 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
             "placed_blocks": 0,
             "total_blocks": total_blocks,
             "placements": [],
-            "unplaced": [],
+            "unplaced": unplaced_items,
             "diagnostics": verification["errors"],
             "message": "Çözüm doğrulama testinden geçemedi; hatalı program yüklenmedi.",
         }

@@ -186,20 +186,21 @@ function sendProgress(payload) {
 
 function getEngineInfo() {
   return new Promise((resolve) => {
-    const launch = resolveSolverLaunch();
+    const launch = resolveMultiSolverLaunch();
     if (!launch.command) {
       resolve({
         available: false,
         engine: 'google_ortools_cp_sat',
         mode: launch.mode,
-        error: `OR-Tools çözücü yürütülebilir dosyası bulunamadı (${launch.executablePath}).`
+        error: `Multi Solver motoru bulunamadı (${launch.executablePath}).`
       });
       return;
     }
 
-    const child = spawn(launch.command, [...launch.baseArgs, '--info'], {
+    const child = spawn(launch.command, [...launch.baseArgs, '--health-all'], {
       shell: false,
-      windowsHide: true
+      windowsHide: true,
+      env: buildBundledEngineEnv()
     });
 
     let stdout = '';
@@ -210,9 +211,9 @@ function getEngineInfo() {
         available: false,
         engine: 'google_ortools_cp_sat',
         mode: launch.mode,
-        error: 'OR-Tools motor bilgisi zaman aşımına uğradı.'
+        error: 'Motor bilgisi kontrolü zaman aşımına uğradı.'
       });
-    }, 10000);
+    }, 25000);
 
     child.stdout.on('data', (chunk) => { stdout += chunk.toString('utf8'); });
     child.stderr.on('data', (chunk) => { stderr += chunk.toString('utf8'); });
@@ -222,7 +223,7 @@ function getEngineInfo() {
         available: false,
         engine: 'google_ortools_cp_sat',
         mode: launch.mode,
-        error: `OR-Tools başlatılamadı: ${err.message}`
+        error: `Dağıtım motoru başlatılamadı: ${err.message}`
       });
     });
     child.on('close', (code) => {
@@ -232,17 +233,21 @@ function getEngineInfo() {
           available: false,
           engine: 'google_ortools_cp_sat',
           mode: launch.mode,
-          error: `OR-Tools bilgi komutu hata verdi (kod ${code}): ${stderr.trim()}`
+          error: `Motor bilgi komutu hata verdi (kod ${code}): ${stderr.trim()}`
         });
         return;
       }
       try {
-        const parsed = JSON.parse(stdout);
+        const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
+        const lastJson = lines.reverse().find((l) => l.trim().startsWith('{') && l.trim().endsWith('}'));
+        const parsed = JSON.parse(lastJson || '{}');
+        const ort = parsed.engines && parsed.engines.ortools ? parsed.engines.ortools : null;
         resolve({
-          available: parsed.engine === 'google_ortools_cp_sat',
-          engine: parsed.engine,
-          ortools_version: parsed.ortools_version || null,
-          python_version: parsed.python_version || null,
+          available: Boolean(parsed.available_engines > 0 || (ort && ort.available)),
+          engine: 'google_ortools_cp_sat',
+          ortools_version: (ort && ort.version) || null,
+          available_engines: parsed.available_engines || 0,
+          total_engines: parsed.total_engines || 6,
           mode: launch.mode
         });
       } catch (err) {
@@ -250,7 +255,7 @@ function getEngineInfo() {
           available: false,
           engine: 'google_ortools_cp_sat',
           mode: launch.mode,
-          error: `OR-Tools yanıtı çözümlenemedi: ${err.message}`
+          error: `Motor yanıtı çözümlenemedi: ${err.message}`
         });
       }
     });
