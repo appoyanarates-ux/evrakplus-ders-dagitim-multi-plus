@@ -1,49 +1,54 @@
-appId: com.evrakplus.dersdagitim
-productName: EvrakPlus Ders Dagitim
+appId: com.evrakplus.dersdagitim.multiplus
+productName: EvrakPlus Ders Dagitim Multi Plus
 copyright: Copyright © 2026 EvrakPlus
 directories:
   output: release
   buildResources: build
+asar: true
 files:
   - electron/**/*
   - renderer/**/*
   - package.json
-  - "!renderer/assets/input.css"
 extraResources:
-  - from: dist/solver_ortools
-    to: solver_ortools
-    filter:
-      - "**/*"
+  - from: resources/engines/ortools
+    to: engines/ortools
+  - from: resources/engines/timefold
+    to: engines/timefold
+  - from: resources/engines/choco
+    to: engines/choco
+  - from: resources/engines/minizinc
+    to: engines/minizinc
+  - from: resources/runtime/java
+    to: runtime/java
+  - from: resources/models
+    to: models
+  - from: THIRD_PARTY_LICENSES.md
+    to: licenses/THIRD_PARTY_LICENSES.md
 win:
   icon: build/icon.ico
+  signAndEditExecutable: false
   verifyUpdateCodeSignature: false
   target:
     - target: nsis
       arch:
         - x64
-  artifactName: "EvrakPlus-Ders-Dagitim-Setup-${version}.exe"
+    - target: portable
+      arch:
+        - x64
 nsis:
   oneClick: false
   perMachine: false
-  allowElevation: true
   allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  runAfterFinish: true
-  shortcutName: "EvrakPlus Ders Dağıtım"
-  uninstallDisplayName: "EvrakPlus Ders Dağıtım ${version}"
-  deleteAppDataOnUninstall: false
-  installerIcon: build/icon.ico
-  uninstallerIcon: build/icon.ico
-  installerHeaderIcon: build/icon.ico
+  shortcutName: EvrakPlus Ders Dagitim Multi Plus
+  artifactName: EvrakPlus-Ders-Dagitim-Multi-Plus-${version}-Setup.${ext}
   include: build/installer.nsh
-  installerLanguages:
-    - tr_TR
-    - en_US
-  language: "1055"
+portable:
+  artifactName: EvrakPlus-Ders-Dagitim-Multi-Plus-${version}-Portable.${ext}
 publish:
   - provider: github
     owner: appoyanarates-ux
-    repo: ders-dagitim-ultimate
+    repo: evrakplus-ders-dagitim-multi-plus
     releaseType: release
-    vPrefixedTagName: true

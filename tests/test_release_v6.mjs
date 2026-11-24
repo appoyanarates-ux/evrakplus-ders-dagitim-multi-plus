@@ -242,10 +242,10 @@ test('Aşama 6.4: Başlangıç kontrolleri, .gitignore, POSIX WP ZIP ve boş PAT
     }
 
     const builderYml = fs.readFileSync(path.join(projectRoot, 'electron-builder.yml'), 'utf8');
-    assert.ok(builderYml.includes('EvrakPlus-Ders-Dagitim-Setup-${version}.exe'));
+    assert.ok(builderYml.includes('EvrakPlus-Ders-Dagitim-Multi-Plus-${version}-Setup.${ext}'));
     assert.ok(builderYml.includes('deleteAppDataOnUninstall: false'));
     assert.ok(builderYml.includes('owner: appoyanarates-ux'));
-    assert.ok(builderYml.includes('repo: ders-dagitim-ultimate'));
+    assert.ok(builderYml.includes('repo: evrakplus-ders-dagitim-multi-plus'));
 
     // Boş PATH/PYTHONHOME/PYTHONPATH ile paketlenmiş solver_ortools.exe gerçek çözüm + doğrulama testi
     const bundledSolver = path.join(projectRoot, 'release', 'win-unpacked', 'resources', 'solver_ortools', 'solver_ortools.exe');

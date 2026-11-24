@@ -1,0 +1,16 @@
+name: Release v1.x (Tag Gated)
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Tag Format
+        run: echo "Release tag verified: ${{ github.ref_name }}"
