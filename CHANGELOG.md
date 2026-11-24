@@ -1,5 +1,12 @@
 # Sürüm Geçmişi (CHANGELOG)
 
+## [1.0.2] — 2026-11-24
+### Kritik Düzeltme ve Kullanıcı Deneyimi İyileştirmeleri
+- **Çok Motorlu İmza Hatası Düzeltildi:** `electron/main.cjs` içindeki eski tek-motor imza kontrolü (`Çözücü beklenen google_ortools_cp_sat imzasını döndürmedi`) tüm 6 gerçek motoru (`ortools`, `timefold`, `choco`, `minizinc`, `scip`, `highs`, `multi_solver`) kabul edecek şekilde düzeltildi.
+- **%100 Tam Otomatik Dağıtım Ekranı:** Menü 5'teki teknik motor kartları ve mod seçiciler kapalı **"Gelişmiş Motor Ayarları"** çekmecesine alındı; ön planda yalnızca anlaşılır pedagojik kurallar (**Aynı Öğretmen + Aynı Sınıf Farklı Ders**, **Otomatik Alternatif Bloklar [varsayılan açık]**, **Akıllı Esnek Limit Kurtarma**) bırakıldı.
+- **Öğretmen Değişince Otomatik Boşa Düşme & Hover Gösterimi:** Menü 4'te bir dersin öğretmeni değiştirildiğinde mevcut programdaki yerleşmiş blokları otomatik boşa düşer; Menü 5 şablonlarında hem üst özet çubuğunda hem de Öğretmen Çarşafı'nda öğretmen isminin üzerinde rozet ve üzerine gelince detaylı liste olarak görünür.
+- **5 Eksenli Tam Kök Neden & Alternatif Öğretmen Analizi:** Yerleşemeyen dersler için öğretmen gün/saat kısıtı, haftalık ders yükü aşımı, blok uzunluğu, özel derslik doluluğu ve **branş/branş dışı boş kapasiteli alternatif öğretmen önerisi** ile tek tıkla ilgili ekrana götüren bağlantılar eklendi.
+
 ## [1.0.1] — 2026-11-24
 ### Yenilikler ve İyileştirmeler
 - **Okul Kulüpleri Modülü:** 32 varsayılan MEB okul kulübü eklendi; Menü 3'te öğretmenlere kulüp atama, manuel yeni kulüp ekleme, kulüp silme ve öğretmen ders programı çıktılarında okul kulübü gösterimi eklendi.

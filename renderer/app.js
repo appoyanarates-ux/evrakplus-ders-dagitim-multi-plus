@@ -2533,6 +2533,79 @@ function buildTeacherSelectHtml(selectedTid, courseName, teachers, loadMap, data
   `;
 }
 
+function unplaceAssignmentFromSolution(cls, course, oldTeacherId, newTeacherId) {
+  if (!state.solution || !Array.isArray(state.solution.placements) || !cls || !course) return 0;
+  const aid = `${cls.id}__${course.id}`;
+  const removed = [];
+  const kept = [];
+  state.solution.placements.forEach((pl) => {
+    const match = pl.assignment_id === aid || (pl.class_id === cls.id && pl.course_id === course.id);
+    if (match) removed.push(pl);
+    else kept.push(pl);
+  });
+  if (!removed.length) return 0;
+  state.solution.placements = kept;
+  state.solution.placed_blocks = kept.length;
+  const removedKeys = new Set(removed.map((pl) => getPlacementKey(pl)));
+  state.pinnedPlacementIds = (state.pinnedPlacementIds || []).filter((k) => !removedKeys.has(k));
+  if (!Array.isArray(state.solution.unplaced)) state.solution.unplaced = [];
+  const tMap = Object.fromEntries(getCurrentTeachers().map((t) => [t.id, t]));
+  const oldName = oldTeacherId && tMap[oldTeacherId] ? tMap[oldTeacherId].name : 'Atanmamış';
+  const newName = newTeacherId && tMap[newTeacherId] ? tMap[newTeacherId].name : 'Atanmamış';
+  removed.forEach((pl) => {
+    state.solution.unplaced.push({
+      block_id: pl.block_id || `${aid}__b${pl.block_index}`,
+      assignment_id: pl.assignment_id || aid,
+      block_index: pl.block_index || 0,
+      class_id: cls.id,
+      class_name: cls.name,
+      course_id: course.id,
+      course_name: course.name,
+      teacher_ids: [course.teacherId, course.teacherId2].filter(Boolean),
+      previous_teacher_id: oldTeacherId || null,
+      length: pl.length || 1,
+      reason: `Öğretmen değişti (${oldName} → ${newName}); bu ders boşa düştü ve yeniden yerleşmeyi bekliyor.`
+    });
+  });
+  return removed.length;
+}
+
+function getUnplacedCourseSummaryMap() {
+  const byTeacher = {};
+  const allUnplaced = [];
+  if (!state.solution || !Array.isArray(state.solution.placements)) return { byTeacher, allUnplaced };
+  const placedCountByAid = {};
+  state.solution.placements.forEach((pl) => {
+    const k = pl.assignment_id || `${pl.class_id}__${pl.course_id}`;
+    placedCountByAid[k] = (placedCountByAid[k] || 0) + 1;
+  });
+  getCurrentClasses().forEach((cls) => {
+    (cls.courses || []).forEach((c) => {
+      const blocks = Array.isArray(c.blocks) && c.blocks.length ? c.blocks : [Number(c.hours) || 1];
+      const aid = `${cls.id}__${c.id}`;
+      const placedCnt = placedCountByAid[aid] || 0;
+      const missingCnt = Math.max(0, blocks.length - placedCnt);
+      if (missingCnt > 0) {
+        const missingHours = blocks.slice(placedCnt).reduce((s, b) => s + (Number(b) || 1), 0);
+        const item = {
+          classId: cls.id,
+          className: cls.name,
+          courseName: c.name,
+          missingBlocks: missingCnt,
+          missingHours,
+          teacherIds: [c.teacherId, c.teacherId2].filter(Boolean)
+        };
+        allUnplaced.push(item);
+        item.teacherIds.forEach((tid) => {
+          if (!byTeacher[tid]) byTeacher[tid] = [];
+          byTeacher[tid].push(item);
+        });
+      }
+    });
+  });
+  return { byTeacher, allUnplaced };
+}
+
 function renderMenu4() {
   ensureState(state);
   const classes = getCurrentClasses();
@@ -2628,8 +2701,14 @@ function renderMenu4() {
         const cls = classes.find((x) => x.id === sel.dataset.acls);
         const c = cls && (cls.courses || []).find((x) => x.id === sel.dataset.acrs);
         if (!c) return;
-        if (sel.dataset.slot === '2') c.teacherId2 = sel.value || null; else c.teacherId = sel.value || null;
+        const oldTid = sel.dataset.slot === '2' ? c.teacherId2 : c.teacherId;
+        const newTid = sel.value || null;
+        if (sel.dataset.slot === '2') c.teacherId2 = newTid; else c.teacherId = newTid;
+        const dropped = unplaceAssignmentFromSolution(cls, c, oldTid, newTid);
         saveState(); renderMenu4();
+        if (dropped > 0) {
+          showToast(`${cls.name} - ${c.name} dersi öğretmen değiştiği için boşa düştü (${dropped} blok). Menü 5'ten "Boştaki Dersleri Yerleştir" ile dağıtabilirsiniz.`);
+        }
       }));
       tableWrap.querySelectorAll('.m4-room-sel').forEach((sel) => sel.addEventListener('change', () => {
         const cls = classes.find((x) => x.id === sel.dataset.rcls);
@@ -3545,6 +3624,9 @@ function renderMenu5Templates() {
 
   const pinnedCnt = (state.pinnedPlacementIds || []).length;
   const lockedTCnt = (state.lockedTeacherIds || []).length;
+  const unplacedInfo = getUnplacedCourseSummaryMap();
+  const totalUnplacedBlocks = unplacedInfo.allUnplaced.reduce((s, u) => s + u.missingBlocks, 0);
+  const unplacedTooltip = unplacedInfo.allUnplaced.slice(0, 12).map((u) => `${u.className} ${u.courseName} (${u.missingBlocks} blok / ${u.missingHours} sa)`).join('\n');
   lockBarEl.innerHTML = `
     <div class="flex flex-wrap items-center gap-3">
       <span class="inline-flex items-center gap-1.5 font-bold ${pinnedCnt > 0 ? 'text-amber-800' : 'text-slate-500'}">
@@ -3555,6 +3637,9 @@ function renderMenu5Templates() {
         <span class="w-3.5 h-3.5 rounded border-2 border-emerald-600 bg-emerald-200 inline-block"></span>
         Kilitli Öğretmen: <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900">${lockedTCnt}</span>
       </span>
+      ${totalUnplacedBlocks > 0 ? `<span title="${escapeHtml(unplacedTooltip)}" class="inline-flex items-center gap-1.5 font-bold text-rose-700 cursor-help px-2 py-0.5 rounded-lg bg-rose-50 border border-rose-200">
+        Boşta / Yerleşmemiş Ders: <span class="px-1.5 py-0.5 rounded bg-rose-600 text-white">${totalUnplacedBlocks} blok</span>
+      </span>` : ''}
     </div>
     ${(pinnedCnt > 0 || lockedTCnt > 0) ? `<button type="button" id="btnM5UnlockAll" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold transition">Tüm Kilitleri Kaldır</button>` : `<span class="text-[11px] text-slate-400">Kilitlenen ders ve öğretmenler yeniden dağıtımda sabit kalır</span>`}
   `;
@@ -3716,11 +3801,16 @@ function renderMenu5Templates() {
           ${teachers.map((t) => {
             ensureTeacherAvailabilitySize(t);
             const tLocked = (state.lockedTeacherIds || []).includes(t.id);
+            const tUnplaced = unplacedInfo.byTeacher[t.id] || [];
+            const tUnplacedCnt = tUnplaced.reduce((s, u) => s + u.missingBlocks, 0);
+            const tUnplacedTip = tUnplaced.length
+              ? 'Boşta bekleyen dersler:\n' + tUnplaced.map((u) => `• ${u.className} ${u.courseName} (${u.missingBlocks} blok / ${u.missingHours} sa)`).join('\n')
+              : `${t.name} (${t.branch}) — Tüm atanmış dersleri yerleşmiş`;
             return `<tr class="${tLocked ? 'ring-1 ring-inset ring-emerald-400' : ''}">
-              <td class="sticky left-0 z-10 py-1.5 px-2 border border-slate-300 border-r-2 border-r-slate-400 ${tLocked ? 'bg-emerald-100 border-l-4 border-l-emerald-600' : 'bg-white'} whitespace-nowrap max-w-[195px]">
+              <td title="${escapeHtml(tUnplacedTip)}" class="sticky left-0 z-10 py-1.5 px-2 border border-slate-300 border-r-2 border-r-slate-400 ${tLocked ? 'bg-emerald-100 border-l-4 border-l-emerald-600' : 'bg-white'} whitespace-nowrap max-w-[195px]">
                 <div class="flex items-center justify-between gap-1.5">
                   <div class="min-w-0">
-                    <div class="text-[11px] font-bold text-slate-900 truncate">${tLocked ? '🔒 ' : ''}${escapeHtml(t.name)}</div>
+                    <div class="text-[11px] font-bold text-slate-900 truncate flex items-center gap-1">${tLocked ? '🔒 ' : ''}${escapeHtml(t.name)}${tUnplacedCnt > 0 ? ` <span class="px-1 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 text-[9px] font-extrabold">${tUnplacedCnt} boşta</span>` : ''}</div>
                     <div class="text-[9px] ${tLocked ? 'text-emerald-800 font-bold' : 'text-slate-500'} truncate">${tLocked ? 'KİLİTLİ · ' : ''}${escapeHtml(t.branch)}</div>
                   </div>
                   <button type="button" data-m5-lock-tid="${t.id}" class="m5-lock-t-btn px-1.5 py-1 rounded text-[10px] font-bold shrink-0 transition ${tLocked ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800'}">${tLocked ? 'Kilitli' : 'Kilitle'}</button>

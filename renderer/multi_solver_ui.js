@@ -1,18 +1,19 @@
 /**
  * EvrakPlus Multi Solver Merkezi (multi_solver_ui.js)
- * 6 gerçek optimizasyon motorunun sağlık, sürüm, donanım kaynakları,
- * dağıtım modu, süre bütçesi ve alternatif çizelge karşılaştırma ekranını yönetir.
+ * Varsayılan olarak %100 TAM OTOMATİK çalışır: kullanıcı teknik motor ayarlarıyla uğraşmaz.
+ * Ön planda yalnızca öğretmen ve ders bloğu bazlı anlaşılır pedagojik kurallar yer alır.
+ * İleri düzey motor seçimi ve donanım ayarları kapalı "Gelişmiş Motor Ayarları" çekmecesindedir.
  */
 (function (global) {
   'use strict';
 
   const ENGINE_META = [
-    { key: 'ortools', id: 'google_ortools_cp_sat', name: 'Google OR-Tools CP-SAT', role: 'Ana optimizasyon motoru', badge: 'CP-SAT' },
-    { key: 'timefold', id: 'timefold_solver', name: 'Timefold Solver', role: 'Çözüm ve kalite optimizasyonu', badge: 'Java 21' },
-    { key: 'choco', id: 'choco_solver', name: 'Choco Solver', role: 'Karmaşık kısıt çözümü', badge: 'Java 21 CP' },
-    { key: 'minizinc', id: 'minizinc', name: 'MiniZinc (Gecode / Chuffed)', role: 'Alternatif CP modelleme altyapısı', badge: 'MiniZinc' },
-    { key: 'scip', id: 'scip', name: 'SCIP Optimization Suite', role: 'Tamsayılı matematiksel optimizasyon', badge: 'MILP' },
-    { key: 'highs', id: 'highs', name: 'HiGHS MILP Solver', role: 'Yüksek performanslı MILP çözücü', badge: 'MILP' }
+    { key: 'ortools', id: 'google_ortools_cp_sat', name: 'Google OR-Tools CP-SAT', role: 'Ana optimizasyon motoru' },
+    { key: 'timefold', id: 'timefold_solver', name: 'Timefold Solver', role: 'Çözüm ve kalite optimizasyonu' },
+    { key: 'choco', id: 'choco_solver', name: 'Choco Solver', role: 'Karmaşık kısıt çözümü' },
+    { key: 'minizinc', id: 'minizinc', name: 'MiniZinc (Gecode / Chuffed)', role: 'Alternatif CP modelleme altyapısı' },
+    { key: 'scip', id: 'scip', name: 'SCIP Optimization Suite', role: 'Tamsayılı matematiksel optimizasyon' },
+    { key: 'highs', id: 'highs', name: 'HiGHS MILP Solver', role: 'Yüksek performanslı MILP çözücü' }
   ];
 
   const VALID_ENGINES = new Set([
@@ -28,15 +29,18 @@
   ]);
 
   const multiState = {
-    mode: 'auto', // auto | single | sequential | parallel | hybrid | ultimate
+    mode: 'auto', // Varsayılan %100 Tam Otomatik
     selectedEngines: ['ortools', 'timefold', 'highs'],
     singleEngine: 'ortools',
-    timePreset: '60', // 30, 120, 300, 600, 1800, 3600, custom, manual
+    timePreset: '60',
     customTimeSec: 90,
-    performanceMode: 'balanced', // low | balanced | high
-    minizincBackend: 'gecode', // gecode | chuffed
+    performanceMode: 'balanced',
+    minizincBackend: 'gecode',
+    // Pedagojik kurallar (kullanıcı dostu)
     sameTeacherClassMultiCourseMode: 'soft', // soft | hard | off
-    allowBlockAlternatives: false,
+    allowBlockAlternatives: true,            // Varsayılan AÇIK: sıkışık durumda otomatik 3-4 sa blokları bölerek kurtarır
+    autoRelaxSoftLimitsOnStuck: true,        // PASS 3-4: çözüm çıkmazsa esnek boşluk/ardışık limitlerini kontrollü esnet
+    showAdvanced: false,
     health: null,
     lastCandidates: [],
     lastPassLog: [],
@@ -52,7 +56,7 @@
   function getMultiSolverRequestOptions() {
     const engines = multiState.mode === 'single'
       ? [multiState.singleEngine]
-      : (multiState.selectedEngines.length ? multiState.selectedEngines.slice() : ['ortools']);
+      : (multiState.mode === 'auto' ? [] : (multiState.selectedEngines.length ? multiState.selectedEngines.slice() : ['ortools']));
     return {
       multi_mode: multiState.mode,
       engines,
@@ -61,7 +65,7 @@
       minizinc_backend: multiState.minizincBackend,
       same_teacher_class_multi_course_mode: multiState.sameTeacherClassMultiCourseMode,
       allow_block_alternatives: Boolean(multiState.allowBlockAlternatives),
-      enable_multipass: true
+      enable_multipass: Boolean(multiState.autoRelaxSoftLimitsOnStuck || multiState.allowBlockAlternatives)
     };
   }
 
@@ -71,8 +75,6 @@
 
   async function refreshHealth() {
     const api = global.dersDagitimAPI;
-    const statusEl = document.getElementById('msSystemSummary');
-    if (statusEl) statusEl.textContent = 'Motor sağlık kontrolleri yapılıyor...';
     if (api && typeof api.getMultiSolverHealth === 'function') {
       try {
         multiState.health = await api.getMultiSolverHealth();
@@ -80,12 +82,7 @@
         multiState.health = { available_engines: 0, total_engines: 6, engines: {}, error: err.message };
       }
     } else {
-      multiState.health = {
-        available_engines: 0,
-        total_engines: 6,
-        engines: {},
-        previewMode: true
-      };
+      multiState.health = { available_engines: 0, total_engines: 6, engines: {}, previewMode: true };
     }
     renderMultiSolverCenter();
   }
@@ -95,24 +92,24 @@
     if (!container) return;
 
     const h = multiState.health;
-    const sys = h && h.system ? h.system : null;
-    const sysText = sys
-      ? `CPU: ${sys.cpu_cores} çekirdek · Kullanılabilir RAM: ${Math.round(sys.available_ram_mb / 1024 * 10) / 10} / ${Math.round(sys.total_ram_mb / 1024 * 10) / 10} GB · Aktif Motor: ${h.available_engines}/${h.total_engines}`
-      : (h && h.previewMode
-        ? 'Web / Önizleme Modu — 6 native motor Windows masaüstü uygulamasında veya harici Solver Server üzerinden çalışır.'
-        : 'Motor durumu kontrol edilmedi.');
+    const availCount = h && typeof h.available_engines === 'number' ? h.available_engines : 0;
+    const totalCount = h && typeof h.total_engines === 'number' ? h.total_engines : 6;
+    const autoBadge = availCount > 0
+      ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold">Tam Otomatik Aktif · ${availCount}/${totalCount} Motor Hazır</span>`
+      : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[11px] font-semibold">Tam Otomatik Mod</span>`;
 
     const modeOptions = [
-      ['auto', 'Akıllı Otomatik Mod'],
-      ['single', 'Tek Motor Modu'],
-      ['sequential', 'Sıralı Motor Modu'],
-      ['parallel', 'Paralel Motor Modu'],
-      ['hybrid', 'Hibrit Optimizasyon (OR-Tools + Timefold + Diğerleri)'],
-      ['ultimate', 'Ultimate Optimizasyon Modu']
+      ['auto', 'Tam Otomatik (Önerilen — okul büyüklüğüne göre en iyi motorları seçer)'],
+      ['hybrid', 'Hibrit Kalite İyileştirme'],
+      ['single', 'Tek Motor'],
+      ['sequential', 'Sıralı Motor'],
+      ['parallel', 'Paralel Motor'],
+      ['ultimate', 'Ultimate Optimizasyon']
     ];
 
     const timeOptions = [
       ['30', '30 saniye (Hızlı)'],
+      ['60', '1 dakika (Otomatik)'],
       ['120', '2 dakika (Normal)'],
       ['300', '5 dakika (Gelişmiş)'],
       ['600', '10 dakika (Derin)'],
@@ -143,8 +140,6 @@
             <span>Kalite: <strong class="text-indigo-700">${cand.quality_score}/100</strong></span>
             <span>Süre: <strong>${cand.solve_time_sec} sn</strong></span>
             <span>Blok: <strong>${cand.placed_blocks}/${cand.total_blocks}</strong></span>
-            <span>Zorunlu İhlal: <strong>${cand.hard_violations}</strong></span>
-            <span>Esnek İhlal: <strong>${cand.soft_violations}</strong></span>
           </div>`
         : '';
 
@@ -170,129 +165,152 @@
       `;
     }).join('');
 
-    const comparisonHtml = (multiState.lastCandidates && multiState.lastCandidates.length > 0)
+    const validCands = (multiState.lastCandidates || []).filter((c) => c && c.valid && Array.isArray(c.placements) && c.placements.length);
+    const comparisonHtml = validCands.length > 1
       ? `
-        <div class="mt-4 pt-4 border-t border-slate-200 space-y-2">
+        <div class="mt-3 pt-3 border-t border-slate-200 space-y-2">
           <div class="flex items-center justify-between">
-            <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Alternatif Çizelge Karşılaştırması (Bağımsız Doğrulama & 100'lük Ortak Kalite Puanı)</h4>
-            <span class="text-[11px] text-slate-500">${multiState.lastCandidates.length} motor sonucu</span>
+            <h4 class="text-xs font-bold text-slate-900">Alternatif Geçerli Çizelgeler (En Yüksek Kalite Puanlısı Otomatik Seçildi)</h4>
+            <span class="text-[11px] text-slate-500">${validCands.length} alternatif</span>
           </div>
           <div class="overflow-x-auto">
             <table class="min-w-full text-xs border border-slate-200 rounded-lg overflow-hidden">
               <thead class="bg-slate-50 text-slate-700">
                 <tr>
-                  <th class="px-2.5 py-2 text-left">Motor</th>
-                  <th class="px-2.5 py-2 text-left">Durum</th>
-                  <th class="px-2.5 py-2 text-center">Geçerli</th>
-                  <th class="px-2.5 py-2 text-center">Atanan Blok</th>
-                  <th class="px-2.5 py-2 text-center">Zorunlu / Esnek İhlal</th>
-                  <th class="px-2.5 py-2 text-center">Süre (sn)</th>
-                  <th class="px-2.5 py-2 text-center">Kalite Puanı</th>
-                  <th class="px-2.5 py-2 text-right">İşlem</th>
+                  <th class="px-2.5 py-1.5 text-left">Çözüm</th>
+                  <th class="px-2.5 py-1.5 text-center">Atanan Blok</th>
+                  <th class="px-2.5 py-1.5 text-center">Süre (sn)</th>
+                  <th class="px-2.5 py-1.5 text-center">Kalite Puanı</th>
+                  <th class="px-2.5 py-1.5 text-right">İşlem</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100 bg-white">
-                ${multiState.lastCandidates.map((c, idx) => `
-                  <tr class="${idx === 0 && c.valid ? 'bg-emerald-50/40' : ''}">
-                    <td class="px-2.5 py-2 font-semibold text-slate-900">
-                      ${c.engine_key || c.engine}${c.backend_solver ? ` (${c.backend_solver})` : ''}
-                      <div class="text-[10px] font-normal text-slate-500">${c.engine_version || ''}</div>
-                    </td>
-                    <td class="px-2.5 py-2">${c.status}</td>
-                    <td class="px-2.5 py-2 text-center">${c.valid ? '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">GEÇERLİ</span>' : '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-bold">GEÇERSİZ</span>'}</td>
-                    <td class="px-2.5 py-2 text-center">${c.placed_blocks}/${c.total_blocks}</td>
-                    <td class="px-2.5 py-2 text-center">${c.hard_violations} / ${c.soft_violations}</td>
-                    <td class="px-2.5 py-2 text-center">${c.solve_time_sec}</td>
-                    <td class="px-2.5 py-2 text-center font-bold text-indigo-700">${c.quality_score} / 100</td>
-                    <td class="px-2.5 py-2 text-right">
-                      ${c.valid && Array.isArray(c.placements) && c.placements.length
-                        ? `<button type="button" data-ms-apply="${idx}" class="ms-apply-candidate px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold">Bu Çizelgeyi Uygula</button>`
-                        : '<span class="text-[11px] text-slate-400">Uygulanamaz</span>'}
+                ${validCands.map((c, idx) => `
+                  <tr class="${idx === 0 ? 'bg-emerald-50/40' : ''}">
+                    <td class="px-2.5 py-1.5 font-semibold text-slate-900">Alternatif #${idx + 1} <span class="text-[10px] text-slate-500 font-normal">(${c.engine_key || c.engine})</span></td>
+                    <td class="px-2.5 py-1.5 text-center">${c.placed_blocks}/${c.total_blocks}</td>
+                    <td class="px-2.5 py-1.5 text-center">${c.solve_time_sec}</td>
+                    <td class="px-2.5 py-1.5 text-center font-bold text-indigo-700">${c.quality_score} / 100</td>
+                    <td class="px-2.5 py-1.5 text-right">
+                      <button type="button" data-ms-apply="${multiState.lastCandidates.indexOf(c)}" class="ms-apply-candidate px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold">Bu Çizelgeyi Uygula</button>
                     </td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
           </div>
-          ${multiState.lastRelaxations && multiState.lastRelaxations.length
-            ? `<div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-900"><strong>Multi-Pass Esnetme Raporu:</strong> ${multiState.lastRelaxations.join(' · ')}</div>`
-            : ''}
         </div>
       `
       : '';
 
+    const relaxHtml = multiState.lastRelaxations && multiState.lastRelaxations.length
+      ? `<div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-900"><strong>Otomatik Kurtarma Raporu:</strong> ${multiState.lastRelaxations.join(' · ')}</div>`
+      : '';
+
     container.innerHTML = `
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-3.5">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
-            <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold">EvrakPlus Multi Solver Optimization Engine</div>
-            <h3 class="text-base font-bold text-slate-900 mt-1">Multi Solver Merkezi (6 Gerçek Optimizasyon Altyapısı)</h3>
-            <p id="msSystemSummary" class="text-xs text-slate-500 mt-0.5">${sysText}</p>
+            <h3 class="text-sm font-bold text-slate-900">Akıllı Dağıtım Kuralları</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Sistem okul büyüklüğüne göre en uygun motorları otomatik çalıştırır; siz yalnızca okulunuzun pedagojik kurallarını belirleyin.</p>
           </div>
-          <button id="btnMsRefreshHealth" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700">
-            Sağlık Kontrolünü Yenile
-          </button>
+          <div class="flex items-center gap-2">
+            ${autoBadge}
+            <button id="btnMsToggleAdvanced" type="button" class="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] font-semibold text-slate-600 transition">
+              ${multiState.showAdvanced ? 'Gelişmiş Ayarları Gizle ▲' : 'Gelişmiş Motor Ayarları ▼'}
+            </button>
+          </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <label class="block text-xs font-semibold text-slate-700">
-            Çalışma Modu
-            <select id="msModeSelect" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-medium">
-              ${modeOptions.map(([v, l]) => `<option value="${v}" ${multiState.mode === v ? 'selected' : ''}>${l}</option>`).join('')}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <label class="block text-xs font-semibold text-slate-700 rounded-xl border border-indigo-100 bg-indigo-50/40 p-3">
+            Aynı Öğretmen + Aynı Sınıf Farklı Ders Kuralı
+            <span class="block text-[10px] font-normal text-slate-500 mt-0.5">Kendi branşı + branş dışı dersi aynı gün aynı sınıfa koyma</span>
+            <select id="msTcMultiCourseSelect" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium">
+              <option value="soft" ${multiState.sameTeacherClassMultiCourseMode === 'soft' ? 'selected' : ''}>Ayrı günlere yay (Önerilen)</option>
+              <option value="hard" ${multiState.sameTeacherClassMultiCourseMode === 'hard' ? 'selected' : ''}>Aynı gün kesinlikle yasak</option>
+              <option value="off" ${multiState.sameTeacherClassMultiCourseMode === 'off' ? 'selected' : ''}>Kapalı</option>
             </select>
           </label>
-          <label class="block text-xs font-semibold text-slate-700">
-            Optimizasyon Süresi
-            <select id="msTimeSelect" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-medium">
-              ${timeOptions.map(([v, l]) => `<option value="${v}" ${multiState.timePreset === v ? 'selected' : ''}>${l}</option>`).join('')}
-            </select>
-            ${multiState.timePreset === 'custom'
-              ? `<input id="msCustomTimeInput" type="number" min="5" max="7200" value="${multiState.customTimeSec}" class="mt-1.5 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs" placeholder="Saniye" />`
-              : ''}
-          </label>
-          <label class="block text-xs font-semibold text-slate-700">
-            Performans & Kaynak Modu
-            <select id="msPerfSelect" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-medium">
-              <option value="low" ${multiState.performanceMode === 'low' ? 'selected' : ''}>Düşük (Tek çekirdek / az RAM)</option>
-              <option value="balanced" ${multiState.performanceMode === 'balanced' ? 'selected' : ''}>Dengeli (Önerilen)</option>
-              <option value="high" ${multiState.performanceMode === 'high' ? 'selected' : ''}>Yüksek Performans</option>
-            </select>
-          </label>
-          <label class="block text-xs font-semibold text-slate-700">
-            MiniZinc Arka Uç Motoru
-            <select id="msMznBackend" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-medium">
-              <option value="gecode" ${multiState.minizincBackend === 'gecode' ? 'selected' : ''}>Gecode 6.6 (Varsayılan CP)</option>
-              <option value="chuffed" ${multiState.minizincBackend === 'chuffed' ? 'selected' : ''}>Chuffed 0.14 (LCG CP)</option>
-            </select>
-          </label>
-        </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 pt-1">
-          <label class="block text-xs font-semibold text-slate-700 rounded-xl border border-indigo-100 bg-indigo-50/40 p-2.5">
-            Aynı Öğretmen + Aynı Sınıf Farklı Ders Kuralı (Kendi Branşı + Branş Dışı)
-            <select id="msTcMultiCourseSelect" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium">
-              <option value="soft" ${multiState.sameTeacherClassMultiCourseMode === 'soft' ? 'selected' : ''}>Ayrı günlere yay (Önerilen — öğretmen ve sınıfı yormaz)</option>
-              <option value="hard" ${multiState.sameTeacherClassMultiCourseMode === 'hard' ? 'selected' : ''}>Aynı gün kesinlikle yasak (Sert kural)</option>
-              <option value="off" ${multiState.sameTeacherClassMultiCourseMode === 'off' ? 'selected' : ''}>Kapalı (Aynı gün girebilir)</option>
-            </select>
+          <label class="flex items-start gap-2.5 text-xs text-slate-700 cursor-pointer rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+            <input id="msAllowBlockAlt" type="checkbox" ${multiState.allowBlockAlternatives ? 'checked' : ''} class="mt-0.5 rounded border-slate-300 text-emerald-600 shrink-0" />
+            <div>
+              <div class="font-semibold text-slate-800">Otomatik Alternatif Bloklar</div>
+              <div class="text-[10px] text-slate-500 mt-0.5">Kesin çözüm çıkmazsa 3–4 saatlik uzun blokları otomatik 2+1 / 2+2 alt bloklara bölerek dağıtımı kurtarır.</div>
+            </div>
           </label>
-          <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer rounded-xl border border-slate-200 bg-slate-50/60 p-2.5">
-            <input id="msAllowBlockAlt" type="checkbox" ${multiState.allowBlockAlternatives ? 'checked' : ''} class="rounded border-slate-300 text-indigo-600 shrink-0" />
-            <span>Multi-Pass PASS 2: Kesin çözüm çıkmazsa uzun blokları (3-4 saat) alternatif alt bloklara bölmeme izin ver (izinsiz asla bölünmez)</span>
+
+          <label class="flex items-start gap-2.5 text-xs text-slate-700 cursor-pointer rounded-xl border border-amber-100 bg-amber-50/40 p-3">
+            <input id="msAutoRelaxSoft" type="checkbox" ${multiState.autoRelaxSoftLimitsOnStuck ? 'checked' : ''} class="mt-0.5 rounded border-slate-300 text-amber-600 shrink-0" />
+            <div>
+              <div class="font-semibold text-slate-800">Akıllı Esnek Limit Kurtarma</div>
+              <div class="text-[10px] text-slate-500 mt-0.5">Program kilitlenirse çakışma/kapalı saatleri bozmadan yalnızca öğretmen boşluk veya ardışık saat limitini +1 esneterek çözüm arar.</div>
+            </div>
           </label>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          ${cardsHtml}
-        </div>
-
+        ${relaxHtml}
         ${comparisonHtml}
+
+        <div id="msAdvancedDrawer" class="${multiState.showAdvanced ? '' : 'hidden'} pt-3 border-t border-slate-200 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="text-xs font-bold text-slate-700">Gelişmiş Motor ve Süre Ayarları (Yalnızca uzman müdahalesi gerekirse değiştirin)</div>
+            <button id="btnMsRefreshHealth" type="button" class="px-2.5 py-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-[11px] font-semibold text-slate-700">Sağlık Kontrolünü Yenile</button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <label class="block text-xs font-semibold text-slate-700">
+              Çalışma Modu
+              <select id="msModeSelect" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium">
+                ${modeOptions.map(([v, l]) => `<option value="${v}" ${multiState.mode === v ? 'selected' : ''}>${l}</option>`).join('')}
+              </select>
+            </label>
+            <label class="block text-xs font-semibold text-slate-700">
+              Optimizasyon Süresi
+              <select id="msTimeSelect" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium">
+                ${timeOptions.map(([v, l]) => `<option value="${v}" ${multiState.timePreset === v ? 'selected' : ''}>${l}</option>`).join('')}
+              </select>
+              ${multiState.timePreset === 'custom'
+                ? `<input id="msCustomTimeInput" type="number" min="5" max="7200" value="${multiState.customTimeSec}" class="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1 text-xs" placeholder="Saniye" />`
+                : ''}
+            </label>
+            <label class="block text-xs font-semibold text-slate-700">
+              Performans Modu
+              <select id="msPerfSelect" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium">
+                <option value="low" ${multiState.performanceMode === 'low' ? 'selected' : ''}>Düşük</option>
+                <option value="balanced" ${multiState.performanceMode === 'balanced' ? 'selected' : ''}>Dengeli (Önerilen)</option>
+                <option value="high" ${multiState.performanceMode === 'high' ? 'selected' : ''}>Yüksek</option>
+              </select>
+            </label>
+            <label class="block text-xs font-semibold text-slate-700">
+              MiniZinc Arka Uç
+              <select id="msMznBackend" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium">
+                <option value="gecode" ${multiState.minizincBackend === 'gecode' ? 'selected' : ''}>Gecode 6.6</option>
+                <option value="chuffed" ${multiState.minizincBackend === 'chuffed' ? 'selected' : ''}>Chuffed 0.14</option>
+              </select>
+            </label>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            ${cardsHtml}
+          </div>
+        </div>
       </div>
     `;
 
-    // Olay dinleyicileri
+    const btnAdv = document.getElementById('btnMsToggleAdvanced');
+    if (btnAdv) btnAdv.addEventListener('click', () => { multiState.showAdvanced = !multiState.showAdvanced; renderMultiSolverCenter(); });
+
     const btnRef = document.getElementById('btnMsRefreshHealth');
     if (btnRef) btnRef.addEventListener('click', refreshHealth);
+
+    const tcMultiSel = document.getElementById('msTcMultiCourseSelect');
+    if (tcMultiSel) tcMultiSel.addEventListener('change', (e) => { multiState.sameTeacherClassMultiCourseMode = e.target.value; });
+
+    const blkChk = document.getElementById('msAllowBlockAlt');
+    if (blkChk) blkChk.addEventListener('change', (e) => { multiState.allowBlockAlternatives = Boolean(e.target.checked); });
+
+    const relChk = document.getElementById('msAutoRelaxSoft');
+    if (relChk) relChk.addEventListener('change', (e) => { multiState.autoRelaxSoftLimitsOnStuck = Boolean(e.target.checked); });
 
     const modeSel = document.getElementById('msModeSelect');
     if (modeSel) modeSel.addEventListener('change', (e) => { multiState.mode = e.target.value; renderMultiSolverCenter(); });
@@ -308,12 +326,6 @@
 
     const mznSel = document.getElementById('msMznBackend');
     if (mznSel) mznSel.addEventListener('change', (e) => { multiState.minizincBackend = e.target.value; });
-
-    const tcMultiSel = document.getElementById('msTcMultiCourseSelect');
-    if (tcMultiSel) tcMultiSel.addEventListener('change', (e) => { multiState.sameTeacherClassMultiCourseMode = e.target.value; });
-
-    const blkChk = document.getElementById('msAllowBlockAlt');
-    if (blkChk) blkChk.addEventListener('change', (e) => { multiState.allowBlockAlternatives = Boolean(e.target.checked); });
 
     container.querySelectorAll('.ms-engine-toggle').forEach((inp) => {
       inp.addEventListener('change', () => {

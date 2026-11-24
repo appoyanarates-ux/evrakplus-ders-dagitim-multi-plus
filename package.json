@@ -1,6 +1,6 @@
 {
   "name": "evrakplus-ders-dagitim-multi-plus",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "EvrakPlus Ders Dağıtım Multi Plus - MEB 2026-2027 Çok Motorlu Ders Dağıtım Programı",
   "author": "EvrakPlus",
   "homepage": "https://www.evrakplus.com/ders-dagitim-multi-plus/",
@@ -17,11 +17,11 @@
     "build:engines:py": "powershell -ExecutionPolicy Bypass -File ./scripts/build_py_engines.ps1",
     "build:engines:java": "powershell -ExecutionPolicy Bypass -File ./scripts/build_java_engines.ps1",
     "build:solver": "npm run build:engines:py && npm run build:engines:java",
-    "build:wp-zip": "node scripts/create_zip.cjs release/EvrakPlus-Multi-Plus-Connect-1.0.1.zip evrakplus-multi-plus-connect",
+    "build:wp-zip": "node scripts/create_zip.cjs release/EvrakPlus-Multi-Plus-Connect-1.0.2.zip evrakplus-multi-plus-connect",
     "build:cpanel-zip": "node scripts/build_cpanel_zip.cjs",
-    "build:solver-server-zip": "node scripts/create_zip.cjs release/EvrakPlus-Ders-Dagitim-Multi-Plus-1.0.1-Solver-Server.zip solver-server",
+    "build:solver-server-zip": "node scripts/create_zip.cjs release/EvrakPlus-Ders-Dagitim-Multi-Plus-1.0.2-Solver-Server.zip solver-server",
     "build:html-preview": "node scripts/build_html_preview.cjs",
-    "build:source-zip": "node scripts/create_zip.cjs release/EvrakPlus-Ders-Dagitim-Multi-Plus-1.0.1-Source.zip electron renderer solver engines web solver-server evrakplus-multi-plus-connect tests scripts build docs .github package.json package-lock.json electron-builder.yml tailwind.config.cjs .gitignore .env.example README.md CHANGELOG.md SECURITY.md THIRD_PARTY_LICENSES.md INSTALLATION.md BUILD.md TEST_REPORT.md KULLANIM_KILAVUZU.md",
+    "build:source-zip": "node scripts/create_zip.cjs release/EvrakPlus-Ders-Dagitim-Multi-Plus-1.0.2-Source.zip electron renderer solver engines web solver-server evrakplus-multi-plus-connect tests scripts build docs .github package.json package-lock.json electron-builder.yml tailwind.config.cjs .gitignore .env.example README.md CHANGELOG.md SECURITY.md THIRD_PARTY_LICENSES.md INSTALLATION.md BUILD.md TEST_REPORT.md KULLANIM_KILAVUZU.md",
     "build:win": "node scripts/generate_icon.cjs && npm run prepare:renderer && electron-builder --win --config electron-builder.yml --publish never",
     "build:checksums": "node scripts/generate_checksums.cjs"
   },

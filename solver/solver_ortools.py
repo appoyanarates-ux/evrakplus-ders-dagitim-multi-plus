@@ -1501,34 +1501,96 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
                 primary_nav: Dict[str, Any] = {"view": "menu4", "classId": cid, "search": crs_name}
                 primary_label = f"{cname} Ders Atamasına Git →"
 
-                # 1. Öğretmen kapalı/dolu saat analizi
+                # 1. Öğretmen gün/saat kısıtı ve ders yükü analizi
+                assigned_hours_by_t: Dict[str, int] = defaultdict(int)
+                for a_all in assignments:
+                    ah = int(a_all.get("hours") or sum(a_all.get("blocks") or []))
+                    for tid_all in (a_all.get("teacher_ids") or []):
+                        assigned_hours_by_t[tid_all] += ah
+
                 for tid in t_ids:
                     if tid not in teacher_map:
                         continue
                     t_obj = teacher_map[tid]
                     t_name = t_obj.get("name", tid)
-                    unavail_cnt = len(teacher_unavail.get(tid, set()))
+                    t_unav = teacher_unavail.get(tid, set())
+                    unavail_cnt = len(t_unav)
                     open_total = max(0, (num_days * periods_per_day) - len(blocked) - unavail_cnt)
                     used_cnt = len(placed_teacher_slots.get(tid, set()))
                     free_cnt = max(0, open_total - used_cnt)
-                    if free_cnt < blen or unavail_cnt >= periods_per_day:
-                        reasons.append(f"{t_name} öğretmeninin açık saatleri yetersiz (kapalı: {unavail_cnt} sa, kalan boş: {free_cnt} sa)")
+                    closed_days = [
+                        _get_day_name(time_grid, dd)
+                        for dd in range(num_days)
+                        if all((dd, pp) in t_unav or (dd, pp) in blocked for pp in range(periods_per_day))
+                    ]
+                    max_w = int(t_obj.get("max_weekly_hours") or 30)
+                    tot_assigned = assigned_hours_by_t.get(tid, 0)
+                    if tot_assigned > max_w:
+                        reasons.append(f"Öğretmen ders yükü aşımı: {t_name} ({tot_assigned}/{max_w} sa)")
+                        suggestions.append(f"{t_name} öğretmeninin haftalık yük sınırını artırın veya bir dersini başka öğretmene aktarın")
+                    if closed_days:
+                        reasons.append(f"Öğretmen gün kısıtı: {t_name} ({', '.join(closed_days)} günü tamamen kapalı)")
+                        suggestions.append(f"{t_name} için {closed_days[0]} gününden en az {blen} saat açın")
+                    elif free_cnt < blen or unavail_cnt >= periods_per_day:
+                        reasons.append(f"Öğretmen saat kısıtı: {t_name} (kapalı: {unavail_cnt} sa, kalan boş: {free_cnt} sa)")
                         suggestions.append(f"{t_name} için kapalı saatlerden en az {blen} saat açın veya günlük üst sınırı artırın")
+                    if closed_days or free_cnt < blen or tot_assigned > max_w:
                         primary_nav = {"view": "menu3", "teacherId": tid}
                         primary_label = f"{t_name} Müsaitliğine Git →"
                         links_list.insert(0, {"nav": {"view": "menu3", "teacherId": tid}, "label": f"{t_name} Müsaitliğine Git →"})
 
-                # 2. Özel derslik analizi
+                # 2. Ders bloğu yapısı analizi
+                if blen >= 3:
+                    reasons.append(f"Ders bloğu uzunluğu ({blen} sa) öğle arası veya kapalı saatlere takılıyor")
+                    alt_str = "2+1" if blen == 3 else "2+2"
+                    suggestions.append(f"{cname} {crs_name} bloğunu {alt_str} şeklinde bölün (veya Otomatik Alternatif Blokları açık tutun)")
+
+                # 3. Özel derslik analizi
                 rtype = asgn.get("room_type") or "standard"
                 if rtype != "standard" or asgn.get("room_id"):
                     reasons.append(f"Özel mekan/derslik ({rtype}) uygun saatlerde dolu")
                     suggestions.append("Özel mekan eşzamanlı kapasitesini artırın veya farklı derslik atayın")
                     links_list.append({"nav": {"view": "menu4", "focus": "rooms"}, "label": "Dersliklere Git →"})
 
-                # 3. Şube boşluk / blok uyumu
+                # 4. Branş / Branş Dışı Alternatif Öğretmen Önerisi
+                crs_lower = crs_name.lower()
+                alt_candidates: List[Tuple[int, str]] = []
+                for other_tid, other_t in teacher_map.items():
+                    if other_tid in t_ids:
+                        continue
+                    o_max = int(other_t.get("max_weekly_hours") or 30)
+                    o_open = max(0, (num_days * periods_per_day) - len(blocked) - len(teacher_unavail.get(other_tid, set())))
+                    o_used = len(placed_teacher_slots.get(other_tid, set()))
+                    o_spare = min(o_max - assigned_hours_by_t.get(other_tid, 0), o_open - o_used)
+                    if o_spare < blen:
+                        continue
+                    o_branch = str(other_t.get("branch") or "").lower()
+                    o_extras = [str(x).lower() for x in (other_t.get("extra_subjects") or [])]
+                    match_score = 0
+                    if o_branch and (o_branch in crs_lower or crs_lower in o_branch):
+                        match_score = 2
+                    elif any(ex and (ex in crs_lower or crs_lower in ex) for ex in o_extras):
+                        match_score = 1
+                    if match_score > 0:
+                        alt_candidates.append((match_score * 100 + o_spare, f"{other_t.get('name', other_tid)} ({o_spare} sa boş)"))
+                if not alt_candidates:
+                    # Aynı branşta boş yoksa en geniş boş kapasiteli diğer öğretmenleri branş dışı seçenek olarak öner
+                    for other_tid, other_t in teacher_map.items():
+                        if other_tid in t_ids:
+                            continue
+                        o_open = max(0, (num_days * periods_per_day) - len(blocked) - len(teacher_unavail.get(other_tid, set())))
+                        o_spare = o_open - len(placed_teacher_slots.get(other_tid, set()))
+                        if o_spare >= blen + 2:
+                            alt_candidates.append((o_spare, f"{other_t.get('name', other_tid)} ({other_t.get('branch', '')}, {o_spare} sa boş)"))
+                if alt_candidates:
+                    alt_candidates.sort(key=lambda x: x[0], reverse=True)
+                    top_alts = ", ".join(name for _, name in alt_candidates[:2])
+                    suggestions.append(f"Alternatif öğretmen önerisi: Bu ders {top_alts} öğretmenine aktarılırsa dağıtılabilir")
+
+                # 5. Genel çakışma açıklaması
                 if not reasons:
                     reasons.append(f"{cname} şubesi ile {t_label} öğretmeninin {blen} saatlik ortak boş bloğu çakışma nedeniyle bulunamadı")
-                    suggestions.append(f"{blen} saatlik bloğu daha küçük parçalara (ör. 1+1) bölün veya öğretmen kapalı saatlerini esnetin")
+                    suggestions.append(f"{blen} saatlik bloğu küçültün veya öğretmenin kapalı saatlerinden birini açın")
 
                 reason = f"{cname} - {crs_name} ({blen} sa blok, {t_label}): " + "; ".join(reasons) + ". Çözüm önerisi: " + "; ".join(suggestions) + "."
                 diag = {

@@ -445,12 +445,23 @@ function runOrToolsSolve(config) {
         }
         const rawOut = fs.readFileSync(outputPath, 'utf8');
         const parsed = JSON.parse(rawOut);
-        if (!parsed || parsed.engine !== 'google_ortools_cp_sat') {
-          throw new Error('Çözücü beklenen google_ortools_cp_sat imzasını döndürmedi.');
+        const ALLOWED_ENGINES = new Set([
+          'google_ortools_cp_sat',
+          'timefold_solver',
+          'choco_solver',
+          'minizinc',
+          'minizinc_gecode',
+          'minizinc_chuffed',
+          'scip',
+          'highs',
+          'multi_solver'
+        ]);
+        if (!parsed || !ALLOWED_ENGINES.has(String(parsed.engine || ''))) {
+          throw new Error(`Çözücü tanınmayan motor imzası döndürdü: ${parsed && parsed.engine}`);
         }
         resolve(parsed);
       } catch (err) {
-        reject(new Error(`OR-Tools sonucu okunamadı: ${err.message}`));
+        reject(new Error(`Dağıtım sonucu okunamadı: ${err.message}`));
       } finally {
         cleanupTmpDir(tmpDir);
       }
