@@ -3,11 +3,12 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('dersDagitimAPI', Object.freeze({
-  // OR-Tools CP-SAT & Doğrulama
+  // Multi Solver Optimization Engine (6 Gerçek Motor) & Doğrulama
   solveTimetable: (config) => ipcRenderer.invoke('ortools:solve', config),
   validateTimetable: (config, solution) => ipcRenderer.invoke('ortools:validate', { config, solution }),
   cancelSolve: () => ipcRenderer.invoke('ortools:cancel'),
   getEngineInfo: () => ipcRenderer.invoke('ortools:info'),
+  getMultiSolverHealth: () => ipcRenderer.invoke('multi:health'),
 
   // Çıktı & Dosya Kaydetme
   exportPdf: (payload) => ipcRenderer.invoke('ortools:export-pdf', payload),

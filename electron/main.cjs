@@ -93,6 +93,39 @@ function assertExportEntitlement() {
   }
 }
 
+function buildBundledEngineEnv() {
+  const baseRoot = app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..');
+  const resRoot = app.isPackaged ? process.resourcesPath : path.join(baseRoot, 'resources');
+  return {
+    ...process.env,
+    EVRAKPLUS_JAVA_EXE: path.join(resRoot, 'runtime', 'java', 'bin', 'java.exe'),
+    EVRAKPLUS_TIMEFOLD_JAR: path.join(resRoot, 'engines', 'timefold', 'timefold-solver-runner.jar'),
+    EVRAKPLUS_CHOCO_JAR: path.join(resRoot, 'engines', 'choco', 'choco-solver-runner.jar'),
+    EVRAKPLUS_MINIZINC_EXE: path.join(resRoot, 'engines', 'minizinc', 'minizinc.exe'),
+    EVRAKPLUS_MZN_MODEL: path.join(resRoot, 'models', 'timetable.mzn')
+  };
+}
+
+function resolveMultiSolverLaunch() {
+  if (app.isPackaged) {
+    const multiExe = path.join(process.resourcesPath, 'engines', 'ortools', 'multi_solver_engine.exe');
+    if (fs.existsSync(multiExe)) {
+      return { command: multiExe, baseArgs: [], mode: 'bundled_multi_exe', executablePath: multiExe };
+    }
+  }
+  const projectRoot = path.resolve(__dirname, '..');
+  const distMultiExe = path.join(projectRoot, 'dist', 'multi_solver_engine', 'multi_solver_engine.exe');
+  if (fs.existsSync(distMultiExe)) {
+    return { command: distMultiExe, baseArgs: [], mode: 'bundled_multi_exe_dev', executablePath: distMultiExe };
+  }
+  const venvPython = path.join(projectRoot, '.venv', 'Scripts', 'python.exe');
+  const multiScript = path.join(projectRoot, 'solver', 'multi_solver_engine.py');
+  if (fs.existsSync(venvPython) && fs.existsSync(multiScript)) {
+    return { command: venvPython, baseArgs: [multiScript], mode: 'venv_python_multi', executablePath: venvPython };
+  }
+  return resolveSolverLaunch();
+}
+
 function resolveSolverLaunch() {
   if (app.isPackaged) {
     const exePath = path.join(process.resourcesPath, 'solver_ortools', 'solver_ortools.exe');
@@ -224,10 +257,53 @@ function getEngineInfo() {
   });
 }
 
+function getMultiSolverHealth() {
+  return new Promise((resolve) => {
+    const launch = resolveMultiSolverLaunch();
+    if (!launch.command) {
+      resolve({
+        orchestrator: 'EvrakPlus Multi Solver Optimization Engine',
+        available_engines: 0,
+        total_engines: 6,
+        engines: {},
+        error: 'Multi Solver motoru bulunamadı.'
+      });
+      return;
+    }
+    const child = spawn(launch.command, [...launch.baseArgs, '--health-all'], {
+      shell: false,
+      windowsHide: true,
+      env: buildBundledEngineEnv()
+    });
+    let stdout = '';
+    let stderr = '';
+    const timer = setTimeout(() => {
+      killProcessTree(child);
+      resolve({ orchestrator: 'EvrakPlus Multi Solver Optimization Engine', available_engines: 0, total_engines: 6, engines: {}, error: 'Sağlık kontrolü zaman aşımına uğradı.' });
+    }, 30000);
+    child.stdout.on('data', (c) => { stdout += c.toString('utf8'); });
+    child.stderr.on('data', (c) => { stderr += c.toString('utf8'); });
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      resolve({ orchestrator: 'EvrakPlus Multi Solver Optimization Engine', available_engines: 0, total_engines: 6, engines: {}, error: err.message });
+    });
+    child.on('close', () => {
+      clearTimeout(timer);
+      try {
+        const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
+        const lastJson = lines.reverse().find((l) => l.trim().startsWith('{') && l.trim().endsWith('}'));
+        resolve(lastJson ? JSON.parse(lastJson) : { orchestrator: 'EvrakPlus Multi Solver Optimization Engine', available_engines: 0, total_engines: 6, engines: {}, error: stderr.slice(-300) });
+      } catch (err) {
+        resolve({ orchestrator: 'EvrakPlus Multi Solver Optimization Engine', available_engines: 0, total_engines: 6, engines: {}, error: err.message });
+      }
+    });
+  });
+}
+
 function runOrToolsSolve(config) {
   return new Promise((resolve, reject) => {
     if (activeSolve) {
-      reject(new Error('Devam eden bir OR-Tools dağıtımı var. Önce bitmesini bekleyin veya Durdur düğmesine basın.'));
+      reject(new Error('Devam eden bir dağıtım işlemi var. Önce bitmesini bekleyin veya Durdur düğmesine basın.'));
       return;
     }
 
@@ -236,9 +312,9 @@ function runOrToolsSolve(config) {
       return;
     }
 
-    const launch = resolveSolverLaunch();
+    const launch = resolveMultiSolverLaunch();
     if (!launch.command) {
-      reject(new Error('Gömülü Google OR-Tools çözücü bulunamadı. Uygulamayı yeniden kurun.'));
+      reject(new Error('Gömülü Multi Solver optimizasyon motoru bulunamadı. Uygulamayı yeniden kurun.'));
       return;
     }
 
@@ -261,15 +337,17 @@ function runOrToolsSolve(config) {
       return;
     }
 
-    sendProgress({ phase: 'validating', message: 'Model kontrol ediliyor' });
+    sendProgress({ phase: 'validating', message: 'PASS 0: Model kontrol ediliyor' });
 
     const child = spawn(launch.command, [...launch.baseArgs, '--input', inputPath, '--output', outputPath], {
       shell: false,
-      windowsHide: true
+      windowsHide: true,
+      env: buildBundledEngineEnv()
     });
 
-    const maxTimeSec = Number(config.solver_config?.max_time_seconds || config.solver_config?.timeLimitSec || 60);
-    const watchdogMs = Math.max(20000, Math.min(630000, (maxTimeSec + 20) * 1000));
+    const reqTime = Number(config.solution_request?.time_limit_sec ?? config.solver_config?.max_time_seconds ?? config.solver_config?.timeLimitSec ?? 60);
+    const maxTimeSec = reqTime <= 0 ? 3600 : reqTime;
+    const watchdogMs = Math.max(30000, Math.min(7200000, (maxTimeSec + 45) * 1000));
 
     const solveRecord = {
       child,
@@ -301,9 +379,10 @@ function runOrToolsSolve(config) {
         if (!trimmed) continue;
         try {
           const msg = JSON.parse(trimmed);
-          if (msg && msg.type === 'progress' && activeSolve && activeSolve.requestId === requestId) {
-            const cleanMsg = String(msg.message || '').replace(/Google\s+OR-Tools|OR-Tools/gi, 'Dağıtım motoru');
-            sendProgress({ phase: msg.phase, message: cleanMsg });
+          if (msg && activeSolve && activeSolve.requestId === requestId) {
+            if (msg.type === 'progress' || msg.type === 'pass' || msg.type === 'engine_start' || msg.type === 'engine_done') {
+              sendProgress(msg);
+            }
           }
         } catch (_e) {
           // JSON olmayan stderr satırı
@@ -688,6 +767,10 @@ async function handleSaveBinary(payload) {
 ipcMain.handle('ortools:info', async (event) => {
   assertIpcSender(event);
   return getEngineInfo();
+});
+ipcMain.handle('multi:health', async (event) => {
+  assertIpcSender(event);
+  return getMultiSolverHealth();
 });
 ipcMain.handle('ortools:solve', async (event, config) => {
   assertIpcSender(event);

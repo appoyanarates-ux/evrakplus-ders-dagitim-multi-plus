@@ -3118,6 +3118,31 @@ async function runScheduleAudit(targetPanelId = null) {
   if (window.lucide) window.lucide.createIcons();
 }
 
+window.applyMultiSolverCandidate = function applyMultiSolverCandidate(cand) {
+  if (!cand || !cand.valid || !Array.isArray(cand.placements) || !cand.placements.length) {
+    showToast('Yalnızca bağımsız doğrulamadan geçmiş geçerli çizelgeler uygulanabilir.');
+    return;
+  }
+  editorHistory.push(state);
+  state.solution = {
+    engine: cand.engine || 'multi_solver',
+    engine_key: cand.engine_key,
+    engine_version: cand.engine_version,
+    status: cand.status || 'FEASIBLE',
+    solve_time_sec: cand.solve_time_sec || 0,
+    placed_blocks: cand.placed_blocks || cand.placements.length,
+    total_blocks: cand.total_blocks || cand.placements.length,
+    placements: cand.placements,
+    unplaced: [],
+    diagnostics: [],
+    quality: { quality_score: cand.quality_score, hard_violations: cand.hard_violations, soft_violations: cand.soft_violations }
+  };
+  saveState();
+  updateUndoRedoButtons();
+  renderMenu5();
+  showToast(`${cand.engine_key || cand.engine} çizelgesi uygulandı (Kalite: ${cand.quality_score}/100).`);
+};
+
 async function startOrToolsSolver(keepPinned = true, onlyUnplaced = false, scopeOpts = null) {
   if (solverRunning) return;
   const api = window.dersDagitimAPI;
@@ -3182,31 +3207,42 @@ async function startOrToolsSolver(keepPinned = true, onlyUnplaced = false, scope
       : [];
   }
 
+  const multiOpts = (window.EvrakPlusMultiSolverUI && typeof window.EvrakPlusMultiSolverUI.getRequestOptions === 'function')
+    ? window.EvrakPlusMultiSolverUI.getRequestOptions()
+    : { multi_mode: 'auto', engines: ['ortools'], time_limit_sec: 60, performance_mode: 'balanced' };
+
   cfg.solution_request = {
     mode,
     target_id: scopeOpts ? (scopeOpts.id || null) : null,
-    preference: state.distributionPreference || 'balanced'
+    preference: state.distributionPreference || 'balanced',
+    ...multiOpts
   };
   cfg.solver_config = {
     engine: REQUIRED_SOLVER,
-    max_time_seconds: 60,
+    max_time_seconds: multiOpts.time_limit_sec || 60,
     preference: state.distributionPreference || 'balanced'
   };
 
   const currentRequest = ++activeSolveRequest;
-  setSolverUiRunning(true, 'Model kontrol ediliyor...');
+  setSolverUiRunning(true, 'PASS 0: Model kontrol ediliyor...');
 
   try {
     const result = await api.solveTimetable(cfg);
     if (currentRequest !== activeSolveRequest) return;
-    if (!result || result.engine !== REQUIRED_SOLVER || !Array.isArray(result.placements)) {
+    if (window.EvrakPlusMultiSolverUI && typeof window.EvrakPlusMultiSolverUI.recordSolveResult === 'function') {
+      window.EvrakPlusMultiSolverUI.recordSolveResult(result);
+    }
+    const engineAccepted = (window.EvrakPlusMultiSolverUI && typeof window.EvrakPlusMultiSolverUI.isAcceptedEngine === 'function')
+      ? window.EvrakPlusMultiSolverUI.isAcceptedEngine(result && result.engine)
+      : (result && result.engine === REQUIRED_SOLVER);
+    if (!result || !engineAccepted || !Array.isArray(result.placements)) {
       throw new Error('Beklenen dağıtım sonucu alınamadı.');
     }
     if (result.status === 'CANCELLED') {
       showToast('Dağıtım durduruldu. Önceki program korundu.');
       return;
     }
-    if (!['OPTIMAL', 'FEASIBLE', 'INFEASIBLE', 'UNKNOWN', 'MODEL_INVALID'].includes(result.status)) {
+    if (!['OPTIMAL', 'FEASIBLE', 'INFEASIBLE', 'UNKNOWN', 'MODEL_INVALID', 'PARTIAL', 'TIME_LIMIT', 'ERROR'].includes(result.status)) {
       throw new Error('Dağıtım motoru geçersiz durum döndürdü.');
     }
 

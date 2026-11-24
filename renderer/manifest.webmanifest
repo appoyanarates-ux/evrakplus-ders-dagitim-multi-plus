@@ -1,49 +1,18 @@
 {
-  "id": "./",
-  "name": "EvrakPlus – Okul Ders Dağıtım Programı",
-  "short_name": "Ders Dağıtım",
-  "description": "MEB 2026-2027 uyumlu okul ders programı, okul nöbeti, manuel düzenleme ve bulut senkronizasyon uygulaması.",
+  "id": "/ders-dagitim-multi-plus/",
+  "name": "EvrakPlus Ders Dağıtım Multi Plus",
+  "short_name": "Multi Plus",
+  "description": "MEB 2026-2027 Altı Motorlu Haftalık Ders Dağıtım, Nöbet ve Programlama Uygulaması",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
-  "background_color": "#f8fafc",
-  "theme_color": "#0f172a",
-  "lang": "tr-TR",
   "orientation": "any",
-  "categories": ["education", "productivity"],
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "lang": "tr",
   "icons": [
-    {
-      "src": "./assets/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "./assets/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "./assets/icon-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Ders Programları",
-      "short_name": "Program",
-      "url": "./index.html#menu6",
-      "icons": [{ "src": "./assets/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Okul Nöbeti",
-      "short_name": "Nöbet",
-      "url": "./index.html#duty",
-      "icons": [{ "src": "./assets/icon-192.png", "sizes": "192x192" }]
-    }
+    { "src": "./assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./assets/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

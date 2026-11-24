@@ -20,11 +20,38 @@ from validate_model import (
 )
 
 
-def validate_result(config: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
+SUPPORTED_ENGINES = {
+    "google_ortools_cp_sat",
+    "timefold_solver",
+    "choco_solver",
+    "minizinc",
+    "minizinc_gecode",
+    "minizinc_chuffed",
+    "scip",
+    "highs",
+}
+
+VALID_STATUSES = {
+    "OPTIMAL",
+    "FEASIBLE",
+    "INFEASIBLE",
+    "UNKNOWN",
+    "PARTIAL",
+    "TIME_LIMIT",
+    "CANCELLED",
+    "ERROR",
+}
+
+
+def validate_result(config: Dict[str, Any], result: Dict[str, Any], allow_partial: bool = False) -> Dict[str, Any]:
     """
+    EvrakPlus Independent Schedule Validator.
+    Bütün optimizasyon motorlarından bağımsız olarak çizelgeyi doğrular.
     Dönüş:
       {
+        "validator": "EvrakPlus Independent Schedule Validator",
         "valid": bool,
+        "classification": "VALID" | "PARTIAL" | "INVALID",
         "errors": [{"code": str, "message": str}],
         "stats": {...}
       }
@@ -32,12 +59,19 @@ def validate_result(config: Dict[str, Any], result: Dict[str, Any]) -> Dict[str,
     errors: List[Dict[str, str]] = []
 
     if not isinstance(result, dict):
-        return {"valid": False, "errors": [{"code": "INVALID_RESULT", "message": "Çözüm nesnesi geçersiz."}], "stats": {}}
+        return {
+            "validator": "EvrakPlus Independent Schedule Validator",
+            "valid": False,
+            "classification": "INVALID",
+            "errors": [{"code": "INVALID_RESULT", "message": "Çözüm nesnesi geçersiz."}],
+            "stats": {},
+        }
 
-    if result.get("engine") != "google_ortools_cp_sat":
+    engine_name = result.get("engine")
+    if engine_name not in SUPPORTED_ENGINES:
         errors.append({
             "code": "INVALID_ENGINE",
-            "message": f"Beklenen motor google_ortools_cp_sat, gelen: {result.get('engine')}",
+            "message": f"Desteklenmeyen veya tanınmayan optimizasyon motoru: {engine_name}",
         })
 
     placements = result.get("placements")
@@ -296,6 +330,79 @@ def validate_result(config: Dict[str, Any], result: Dict[str, Any]) -> Dict[str,
                 "message": f"Öğretmen haftalık çalışılabilir gün sınırı aşıldı: {t.get('name', tid)} ({active_days_count}/{max_work_days} gün).",
             })
 
+    # 5b. Öğretmen haftalık boşluk, günlük/haftalık bina değişim limitleri + sınıf limitleri
+    class_day_periods: Dict[Tuple[str, int], List[int]] = defaultdict(list)
+    class_weekly_hours: Dict[str, int] = defaultdict(int)
+    for (cid, d), items in class_day_spans.items():
+        for _, _, pl in items:
+            blen = int(pl.get("length", 0))
+            p = int(pl.get("start_period", 0))
+            class_weekly_hours[cid] += blen
+            for k in range(blen):
+                class_day_periods[(cid, d)].append(p + k)
+
+    for tid, t in teachers.items():
+        max_w_gaps = int(t.get("max_weekly_gaps") or 0)
+        max_d_bchg = int(t.get("max_daily_building_changes") or 0)
+        max_w_bchg = int(t.get("max_weekly_building_changes") or 0)
+        weekly_gaps_total = 0
+        weekly_bchg_total = 0
+        for d in range(num_days):
+            per_list = sorted(set(teacher_day_periods.get((tid, d), [])))
+            if len(per_list) >= 2:
+                weekly_gaps_total += (per_list[-1] - per_list[0] + 1) - len(per_list)
+            day_items = teacher_day_spans.get((tid, d), [])
+            if len(day_items) >= 2:
+                ordered = sorted(day_items, key=lambda x: x[0])
+                day_bchg = 0
+                prev_b = None
+                for _, _, pl_obj in ordered:
+                    b = _get_building(pl_obj)
+                    if b:
+                        if prev_b and b != prev_b:
+                            day_bchg += 1
+                        prev_b = b
+                weekly_bchg_total += day_bchg
+                if max_d_bchg > 0 and day_bchg > max_d_bchg:
+                    errors.append({
+                        "code": "TEACHER_DAILY_BUILDING_CHANGE_VIOLATION",
+                        "message": f"Öğretmen günlük bina değişim sınırı aşıldı: {t.get('name', tid)} gün {d + 1} ({day_bchg}/{max_d_bchg}).",
+                    })
+        if max_w_gaps > 0 and weekly_gaps_total > max_w_gaps:
+            errors.append({
+                "code": "TEACHER_WEEKLY_GAP_VIOLATION",
+                "message": f"Öğretmen haftalık boş ders sınırı aşıldı: {t.get('name', tid)} ({weekly_gaps_total}/{max_w_gaps}).",
+            })
+        if max_w_bchg > 0 and weekly_bchg_total > max_w_bchg:
+            errors.append({
+                "code": "TEACHER_WEEKLY_BUILDING_CHANGE_VIOLATION",
+                "message": f"Öğretmen haftalık bina değişim sınırı aşıldı: {t.get('name', tid)} ({weekly_bchg_total}/{max_w_bchg}).",
+            })
+
+    for cid, cls in classes.items():
+        c_max_w = int(cls.get("max_weekly_hours") or 0)
+        c_max_d = int(cls.get("max_daily_hours") or 0)
+        c_max_gaps = int(cls.get("max_daily_gaps") or 0)
+        if c_max_w > 0 and class_weekly_hours.get(cid, 0) > c_max_w:
+            errors.append({
+                "code": "CLASS_WEEKLY_MAX_VIOLATION",
+                "message": f"Şube haftalık ders sınırı aşıldı: {cls.get('name', cid)} ({class_weekly_hours[cid]}/{c_max_w}).",
+            })
+        for d in range(num_days):
+            c_per = sorted(set(class_day_periods.get((cid, d), [])))
+            if c_max_d > 0 and len(c_per) > c_max_d:
+                errors.append({
+                    "code": "CLASS_DAILY_MAX_VIOLATION",
+                    "message": f"Şube günlük ders sınırı aşıldı: {cls.get('name', cid)} gün {d + 1} ({len(c_per)}/{c_max_d}).",
+                })
+            if c_max_gaps > 0 and len(c_per) >= 2:
+                c_gaps = (c_per[-1] - c_per[0] + 1) - len(c_per)
+                if c_gaps > c_max_gaps:
+                    errors.append({
+                        "code": "CLASS_DAILY_GAP_VIOLATION",
+                        "message": f"Şube günlük boş ders sınırı aşıldı: {cls.get('name', cid)} gün {d + 1} ({c_gaps}/{c_max_gaps}).",
+                    })
+
     # 6. Özel derslik kapasite kontrolü (sweep-line)
     for (rid, d), items in room_day_spans.items():
         cap = int(rooms[rid].get("simultaneous_capacity") or 1)
@@ -347,12 +454,28 @@ def validate_result(config: Dict[str, Any], result: Dict[str, Any]) -> Dict[str,
                 "message": f"Kilitli dersin dersliği değişmiş: {asgn.get('class_name')} - {asgn.get('course_name')}.",
             })
 
+    non_missing_errors = [e for e in errors if e.get("code") != "MISSING_BLOCKS"]
+    has_missing = any(e.get("code") == "MISSING_BLOCKS" for e in errors)
+    if len(errors) == 0:
+        classification = "VALID"
+        is_valid = True
+    elif allow_partial and has_missing and len(non_missing_errors) == 0 and len(placements) > 0:
+        classification = "PARTIAL"
+        is_valid = True
+    else:
+        classification = "PARTIAL" if (has_missing and len(non_missing_errors) == 0 and len(placements) > 0) else "INVALID"
+        is_valid = False
+
     return {
-        "valid": len(errors) == 0,
+        "validator": "EvrakPlus Independent Schedule Validator",
+        "valid": is_valid,
+        "classification": classification,
         "errors": errors,
         "stats": {
             "expected_blocks": len(expected_blocks),
             "placed_blocks": len(placements),
+            "unplaced_blocks": len(missing),
             "error_count": len(errors),
+            "hard_violation_count": len(non_missing_errors),
         },
     }
