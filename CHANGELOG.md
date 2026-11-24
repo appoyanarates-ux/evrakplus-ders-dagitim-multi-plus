@@ -1,5 +1,13 @@
 # Sürüm Geçmişi (CHANGELOG)
 
+## [1.0.1] — 2026-11-24
+### Yenilikler ve İyileştirmeler
+- **Okul Kulüpleri Modülü:** 32 varsayılan MEB okul kulübü eklendi; Menü 3'te öğretmenlere kulüp atama, manuel yeni kulüp ekleme, kulüp silme ve öğretmen ders programı çıktılarında okul kulübü gösterimi eklendi.
+- **Aynı Öğretmen + Aynı Sınıf Farklı Ders Kuralı:** Bir öğretmenin aynı sınıfa hem kendi branşı hem de branş dışı dersiyle aynı gün girmesini önleyen 3 seçenekli kural (`Ayrı günlere yay`, `Aynı gün yasak`, `Kapalı`) eklendi.
+- **Maksimumda Bitir Özelliği:** Tüm derslerin sığmadığı yoğun durumlarda çakışmasız mümkün olan en fazla dersi yerleştiren mod ve yerleşemeyen her blok için Türkçe kök neden + çözüm önerisi + tek tıkla ilgili menüye götüren bağlantılar eklendi.
+- **Yeni Modern Masaüstü ve PWA Simgesi:** 16–256 px çoklu çözünürlüklü şeffaf köşeli yeni simge (masaüstü kısayolu, görev çubuğu, kurulum sihirbazı ve PWA).
+- **Motor Durum Şeridi Düzeltmesi:** Gömülü `multi_solver_engine.exe` üzerinden 6/6 motorun doğru algılanması sağlandı.
+
 ## [1.0.0] — 2026-11-24
 ### İlk Kararlı Sürüm — EvrakPlus Ders Dağıtım Multi Plus
 - **Altı Gerçek Optimizasyon Motoru:** Google OR-Tools CP-SAT, Timefold Solver, Choco Solver, MiniZinc (Gecode / Chuffed), SCIP ve HiGHS entegrasyonu.

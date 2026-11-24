@@ -60,3 +60,20 @@ test('Electron preload ve main.cjs Multi Solver IPC ve gizlilik kurallarını ko
   assert.match(main, /EVRAKPLUS_JAVA_EXE/);
   assert.match(main, /EVRAKPLUS_MINIZINC_EXE/);
 });
+
+test('Okul Kulüpleri modülü 32 MEB kulübü, manuel ekleme ve silmeyi destekler', async () => {
+  const clubsMod = await import(new URL('../renderer/clubs_module.js', import.meta.url));
+  const api = clubsMod.default || globalThis.EvrakPlusClubs;
+  assert.equal(api.DEFAULT_SCHOOL_CLUBS.length, 32);
+  const st = { teachersBySchool: { s1: [{ id: 't1', name: 'Ali', club: '' }] } };
+  const list = api.getSchoolClubs(st);
+  assert.equal(list.length, 32);
+  const addRes = api.addSchoolClub(st, 'Robotik Kodlama Kulübü');
+  assert.equal(addRes.ok, true);
+  assert.equal(st.schoolClubs.length, 33);
+  st.teachersBySchool.s1[0].club = 'Robotik Kodlama Kulübü';
+  const delRes = api.removeSchoolClub(st, 'Robotik Kodlama Kulübü');
+  assert.equal(delRes.ok, true);
+  assert.equal(st.schoolClubs.length, 32);
+  assert.equal(st.teachersBySchool.s1[0].club, '');
+});

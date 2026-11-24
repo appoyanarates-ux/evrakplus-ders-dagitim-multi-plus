@@ -1924,6 +1924,7 @@ function renderMenu3() {
           <div class="min-w-0">
             <div class="text-xs font-bold text-slate-900 truncate">${escapeHtml(t.name)}</div>
             <div class="text-[11px] text-slate-500 truncate mt-0.5">${escapeHtml(t.branch)} · ${t.minHours}–${t.maxHours} sa</div>
+            ${t.club ? `<div class="text-[10px] font-semibold text-violet-700 truncate mt-0.5">Kulüp: ${escapeHtml(t.club)}</div>` : ''}
           </div>
           <span class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${st.unavail > 0 ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}">${st.avail} açık</span>
         </div>
@@ -2028,6 +2029,20 @@ function renderMenu3() {
         </div>
       </div>
 
+      <div class="pt-1">
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Okul Kulübü</label>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <select id="editTClub" class="flex-1 min-w-[200px] px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white font-medium">
+            <option value="">Kulüp Atanmadı</option>
+            ${(window.EvrakPlusClubs ? window.EvrakPlusClubs.getSchoolClubs(state) : []).map((c) => `<option value="${escapeHtml(c)}" ${activeT.club === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+            ${activeT.club && !(window.EvrakPlusClubs ? window.EvrakPlusClubs.getSchoolClubs(state) : []).includes(activeT.club) ? `<option value="${escapeHtml(activeT.club)}" selected>${escapeHtml(activeT.club)}</option>` : ''}
+          </select>
+          <input id="editTNewClubInput" type="text" placeholder="Manuel yeni kulüp yaz..." class="w-44 px-2 py-1.5 rounded-lg border border-slate-300 text-xs focus:outline-none" />
+          <button id="btnQuickAddTClub" type="button" class="px-2.5 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold transition">+ Ekle & Ata</button>
+          ${activeT.club ? `<button id="btnClearTClub" type="button" title="Öğretmenin kulübünü kaldır" class="px-2 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition">Kaldır</button>` : ''}
+        </div>
+      </div>
+
       <div class="grid grid-cols-3 gap-3 pt-1">
         <div>
           <label class="block text-[11px] font-semibold text-slate-600 mb-1">Günlük Maks. Ardışık <span class="text-slate-400 font-normal">(0=sınırsız)</span></label>
@@ -2092,6 +2107,40 @@ function renderMenu3() {
     activeT.extraSubjects = String(e.target.value || '').split(',').map((s) => s.trim()).filter(Boolean);
     saveState(); renderMenu3();
   });
+  const editTClubEl = document.getElementById('editTClub');
+  if (editTClubEl) {
+    editTClubEl.addEventListener('change', (e) => {
+      activeT.club = e.target.value || '';
+      saveState(); renderMenu3();
+    });
+  }
+  const btnQuickAddTClub = document.getElementById('btnQuickAddTClub');
+  if (btnQuickAddTClub) {
+    btnQuickAddTClub.addEventListener('click', () => {
+      const inp = document.getElementById('editTNewClubInput');
+      const name = inp ? inp.value.trim() : '';
+      if (!name) { showToast('Lütfen eklenecek kulüp adını yazın'); return; }
+      if (window.EvrakPlusClubs) window.EvrakPlusClubs.addSchoolClub(state, name);
+      activeT.club = name;
+      saveState(); renderMenu3();
+      showToast(`"${name}" kulübü eklendi ve ${activeT.name} öğretmenine atandı`);
+    });
+  }
+  const btnClearTClub = document.getElementById('btnClearTClub');
+  if (btnClearTClub) {
+    btnClearTClub.addEventListener('click', () => {
+      activeT.club = '';
+      saveState(); renderMenu3();
+      showToast(`${activeT.name} kulüp ataması kaldırıldı`);
+    });
+  }
+  const clubPanelEl = document.getElementById('m3ClubManagerPanel');
+  if (clubPanelEl && !clubPanelEl.classList.contains('hidden') && window.EvrakPlusClubs) {
+    window.EvrakPlusClubs.renderClubManagerPanel(clubPanelEl, state, (msg) => {
+      saveState(); renderMenu3();
+      if (msg) showToast(msg);
+    });
+  }
   document.getElementById('editTMaxConsec').addEventListener('change', (e) => { activeT.maxConsecutive = Math.max(0, Math.min(10, Number(e.target.value) || 0)); saveState(); });
   document.getElementById('editTMaxGaps').addEventListener('change', (e) => { activeT.maxDailyGaps = Math.max(0, Math.min(6, Number(e.target.value) || 0)); saveState(); });
   document.getElementById('editTMaxDays').addEventListener('change', (e) => { activeT.maxWorkingDays = Math.max(0, Math.min(6, Number(e.target.value) || 0)); saveState(); });
@@ -5457,6 +5506,20 @@ function bindEvents() {
 
   // Menü 3
   document.getElementById('btnAddTeacher').addEventListener('click', openTeacherModal);
+  const btnManageClubs = document.getElementById('btnManageClubs');
+  if (btnManageClubs) {
+    btnManageClubs.addEventListener('click', () => {
+      const panel = document.getElementById('m3ClubManagerPanel');
+      if (!panel || !window.EvrakPlusClubs) return;
+      panel.classList.toggle('hidden');
+      if (!panel.classList.contains('hidden')) {
+        window.EvrakPlusClubs.renderClubManagerPanel(panel, state, (msg) => {
+          saveState(); renderMenu3();
+          if (msg) showToast(msg);
+        });
+      }
+    });
+  }
   document.getElementById('btnBulkTeachers').addEventListener('click', openBulkTeacherModal);
   document.getElementById('m3BranchFilter').addEventListener('change', (e) => { state.teacherBranchFilter = e.target.value; saveState(); renderMenu3(); });
   document.getElementById('m3TeacherSearch').addEventListener('input', (e) => { state.teacherSearch = e.target.value; renderMenu3(); });

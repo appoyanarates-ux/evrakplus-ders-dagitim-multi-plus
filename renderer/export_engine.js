@@ -990,6 +990,7 @@
         </div>
         <div class="meb-info-strip">
           <span>Nöbet Günü: ${escapeHtml(dutyText)}</span>
+          ${teacher.club ? `<span>Okul Kulübü: ${escapeHtml(teacher.club)}</span>` : ''}
           <span>Sınıf Rehberliği: ${escapeHtml(guidanceClass)}</span>
           <span>Sosyal Kulüp: ${escapeHtml(clubText)}</span>
         </div>
