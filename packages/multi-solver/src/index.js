@@ -4,6 +4,8 @@ export { TimefoldAdapter, resolveJavaBinary, resolveTimefoldJar } from '../../..
 export { ChocoAdapter, resolveChocoJar } from '../../../engines/choco/adapter.js';
 export { MiniZincAdapter, resolveMiniZincBinary } from '../../../engines/minizinc/adapter.js';
 export { ScipAdapter } from '../../../engines/scip/adapter.js';
+export { HighsAdapter } from '../../../engines/highs/adapter.js';
+
 
 
 
