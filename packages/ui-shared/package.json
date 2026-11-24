@@ -1,0 +1,9 @@
+{
+  "name": "@evrakplus/ui-shared",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./src/manual-editor.js",
+  "exports": {
+    ".": "./src/manual-editor.js"
+  }
+}
