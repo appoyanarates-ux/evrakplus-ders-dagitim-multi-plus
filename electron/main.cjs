@@ -463,13 +463,15 @@ function cancelActiveSolve() {
 }
 
 function createMainWindow() {
-  const iconPath = path.join(__dirname, '..', 'build', 'icon.png');
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'icon.ico')
+    : path.join(__dirname, '..', 'build', 'icon.ico');
   mainWindow = new BrowserWindow({
     width: 1380,
     height: 860,
     minWidth: 960,
     minHeight: 640,
-    title: `EvrakPlus Ders Dağıtım v${app.getVersion()} — MEB 2026-2027`,
+    title: `EvrakPlus Ders Dağıtım Multi Plus v${app.getVersion()} — MEB 2026-2027`,
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     backgroundColor: '#f8fafc',
     autoHideMenuBar: true,

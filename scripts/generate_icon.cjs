@@ -4,6 +4,14 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
+// Özel yüksek çözünürlüklü icon.ico (> 20 KB) mevcutsa üzerine yazma
+const _masterIco = path.resolve(__dirname, '..', 'build', 'icon.ico');
+const _masterPng = path.resolve(__dirname, '..', 'build', 'icon.png');
+if (fs.existsSync(_masterIco) && fs.existsSync(_masterPng) && fs.statSync(_masterIco).size > 20000) {
+  console.log('Yuksek cozunurluklu ozel simge korundu:', _masterIco, `(${fs.statSync(_masterIco).size} bayt)`);
+  process.exit(0);
+}
+
 // Saf Node.js ile 256x256 PNG ve Windows ICO olusturucu (harici bagimlilik gerektirmez)
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);

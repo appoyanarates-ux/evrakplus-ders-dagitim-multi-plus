@@ -24,6 +24,10 @@ extraResources:
     to: models
   - from: THIRD_PARTY_LICENSES.md
     to: licenses/THIRD_PARTY_LICENSES.md
+  - from: build/icon.ico
+    to: icon.ico
+  - from: build/icon.png
+    to: icon.png
 win:
   icon: build/icon.ico
   signAndEditExecutable: false
@@ -43,6 +47,9 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: EvrakPlus Ders Dagitim Multi Plus
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
   artifactName: EvrakPlus-Ders-Dagitim-Multi-Plus-${version}-Setup.${ext}
   include: build/installer.nsh
 portable:
