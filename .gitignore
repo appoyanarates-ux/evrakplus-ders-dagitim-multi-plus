@@ -14,3 +14,6 @@ resources/engines/*/bin/
 *.sqlite
 *.db
 tmp/
+.tools/
+resources/engines/*/evrakplus-*.jar
+
