@@ -1,0 +1,83 @@
+{
+  "appId": "com.evrakplus.dersdagitim.multiplus",
+  "productName": "EvrakPlus Ders Dağıtım Multi Plus",
+  "copyright": "Copyright © 2026 EvrakPlus",
+  "asar": true,
+  "directories": {
+    "output": "../../dist/windows"
+  },
+  "files": [
+    "src/**/*",
+    "package.json",
+    "../../packages/core-schema/src/**/*",
+    "../../packages/validator/src/**/*",
+    "../../packages/multi-solver/src/**/*",
+    "../../engines/ortools/adapter.js",
+    "../../engines/timefold/adapter.js",
+    "../../engines/choco/adapter.js",
+    "../../engines/minizinc/adapter.js",
+    "../../engines/minizinc/dzn-generator.js",
+    "../../engines/scip/adapter.js",
+    "../../engines/highs/adapter.js"
+  ],
+  "extraResources": [
+    {
+      "from": "../../packages/ui-shared/public",
+      "to": "ui-shared/public"
+    },
+    {
+      "from": "../../engines/ortools/solver_cpsat.py",
+      "to": "engines/ortools/solver_cpsat.py"
+    },
+    {
+      "from": "../../engines/scip/solver_scip.py",
+      "to": "engines/scip/solver_scip.py"
+    },
+    {
+      "from": "../../engines/highs/solver_highs.py",
+      "to": "engines/highs/solver_highs.py"
+    },
+    {
+      "from": "../../engines/minizinc/model.mzn",
+      "to": "engines/minizinc/model.mzn"
+    },
+    {
+      "from": "../../resources/engines",
+      "to": "engines"
+    },
+    {
+      "from": "../../resources/runtime",
+      "to": "runtime"
+    },
+    {
+      "from": "../../resources/licenses",
+      "to": "licenses"
+    }
+  ],
+  "win": {
+    "target": [
+      { "target": "nsis", "arch": ["x64"] },
+      { "target": "portable", "arch": ["x64"] }
+    ],
+    "artifactName": "EvrakPlus-Multi-Plus-${version}-${target}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "perMachine": false,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "EvrakPlus Ders Dağıtım Multi Plus",
+    "artifactName": "EvrakPlus-Multi-Plus-${version}-Setup.${ext}"
+  },
+  "portable": {
+    "artifactName": "EvrakPlus-Multi-Plus-${version}-Portable.${ext}"
+  },
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "evrakplus",
+      "repo": "evrakplus-ders-dagitim-multi-plus"
+    }
+  ]
+}

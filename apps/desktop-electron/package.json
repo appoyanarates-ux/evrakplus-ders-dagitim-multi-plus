@@ -1,0 +1,18 @@
+{
+  "name": "@evrakplus/desktop-electron",
+  "version": "1.0.0",
+  "description": "EvrakPlus Ders Dağıtım Multi Plus — Windows 64-bit Electron Masaüstü Uygulaması",
+  "type": "module",
+  "main": "./src/main.js",
+  "author": "EvrakPlus",
+  "homepage": "https://www.evrakplus.com/ders-dagitim-multi-plus/",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis portable --x64 --config electron-builder.json",
+    "dist:dir": "electron-builder --dir --x64 --config electron-builder.json"
+  },
+  "devDependencies": {
+    "electron": "^34.3.0",
+    "electron-builder": "^25.1.8"
+  }
+}
