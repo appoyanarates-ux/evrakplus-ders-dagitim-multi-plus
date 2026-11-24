@@ -385,7 +385,7 @@ function runOrToolsSolve(config) {
         try {
           const msg = JSON.parse(trimmed);
           if (msg && activeSolve && activeSolve.requestId === requestId) {
-            if (msg.type === 'progress' || msg.type === 'pass' || msg.type === 'engine_start' || msg.type === 'engine_done') {
+            if (msg.type === 'progress' || msg.type === 'pass' || msg.type === 'engine_start' || msg.type === 'engine_done' || msg.type === 'live_snapshot') {
               sendProgress(msg);
             }
           }

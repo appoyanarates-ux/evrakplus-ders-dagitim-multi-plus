@@ -1358,7 +1358,64 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
     if req_mode not in ("regenerate", "full_solve_fresh"):
         solver.parameters.random_seed = 42
 
-    status_code = solver.Solve(model)
+    class LiveProgressCallback(cp_model.CpSolverSolutionCallback):
+        def __init__(self) -> None:
+            super().__init__()
+            self.solution_count = 0
+            self.last_emit_ts = 0.0
+
+        def on_solution_callback(self) -> None:
+            self.solution_count += 1
+            now = time.perf_counter()
+            if self.solution_count > 1 and (now - self.last_emit_ts) < 0.7:
+                return
+            self.last_emit_ts = now
+            live_pl: List[Dict[str, Any]] = []
+            for (aid_c, b_idx_c), cands_c in block_candidates.items():
+                asgn_c = assignments_by_id[aid_c]
+                blen_c = block_meta[(aid_c, b_idx_c)]["length"]
+                for d_c, p_c, var_c in cands_c:
+                    if self.BooleanValue(var_c):
+                        live_pl.append({
+                            "block_id": f"{aid_c}__b{b_idx_c}",
+                            "assignment_id": aid_c,
+                            "block_index": b_idx_c,
+                            "class_id": asgn_c["class_id"],
+                            "class_name": asgn_c.get("class_name", ""),
+                            "course_id": asgn_c.get("course_id", ""),
+                            "course_code": asgn_c.get("course_code", ""),
+                            "course_name": asgn_c.get("course_name", ""),
+                            "teacher_ids": list(asgn_c.get("teacher_ids") or []),
+                            "room_id": block_meta[(aid_c, b_idx_c)].get("room_id") or None,
+                            "day_index": d_c,
+                            "start_period": p_c,
+                            "length": blen_c,
+                        })
+                        break
+            placed_now = len(live_pl)
+            pct = round((placed_now / max(1, total_blocks)) * 100.0, 1)
+            elapsed_now = round(now - t0, 1)
+            try:
+                payload = json.dumps({
+                    "type": "live_snapshot",
+                    "engine": ENGINE_NAME,
+                    "phase": "solving",
+                    "solution_count": self.solution_count,
+                    "placed_blocks": placed_now,
+                    "total_blocks": total_blocks,
+                    "percent": pct,
+                    "elapsed_sec": elapsed_now,
+                    "time_limit_sec": max_time_sec,
+                    "message": f"Canlı çözüm #{self.solution_count} bulundu — {placed_now}/{total_blocks} blok (%{pct}) · kalite iyileştiriliyor ({elapsed_now} sn)",
+                    "placements": live_pl,
+                }, ensure_ascii=False)
+                sys.stderr.write(payload + "\n")
+                sys.stderr.flush()
+            except Exception:
+                pass
+
+    live_cb = LiveProgressCallback()
+    status_code = solver.Solve(model, live_cb)
     status_name = solver.StatusName(status_code)
     solve_time = round(time.perf_counter() - t0, 3)
 

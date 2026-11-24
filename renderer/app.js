@@ -2916,6 +2916,10 @@ let solverRunning = false;
 let activeSolveRequest = 0;
 const REQUIRED_SOLVER = 'google_ortools_cp_sat';
 
+let liveWatchSolution = null;
+let liveElapsedTimer = null;
+let liveStartMs = 0;
+
 function setSolverUiRunning(running, phaseMessage) {
   solverRunning = running;
   for (const id of ['btnM5RunSolver', 'btnM5MaximizeSolve', 'btnM5RestartSolver', 'btnM5PlaceUnplaced']) {
@@ -2925,10 +2929,34 @@ function setSolverUiRunning(running, phaseMessage) {
   const stop = document.getElementById('btnM5StopSolver');
   if (stop) stop.disabled = !running;
   const prog = document.getElementById('m5ProgressWrap');
-  if (prog) prog.classList.toggle('hidden', !running);
-  if (running && phaseMessage) {
-    const lbl = document.getElementById('m5ProgressLabel');
-    if (lbl) lbl.textContent = phaseMessage;
+  const lbl = document.getElementById('m5ProgressLabel');
+  const pctEl = document.getElementById('m5ProgressPct');
+  const barEl = document.getElementById('m5ProgressBarFill');
+  const blkEl = document.getElementById('m5LiveBlocks');
+  const solEl = document.getElementById('m5LiveSolutions');
+  const elpEl = document.getElementById('m5LiveElapsed');
+
+  if (running) {
+    liveWatchSolution = null;
+    liveStartMs = Date.now();
+    if (prog) prog.classList.remove('hidden');
+    if (lbl && phaseMessage) lbl.textContent = phaseMessage;
+    if (pctEl) pctEl.textContent = '%0';
+    if (barEl) { barEl.style.width = '6%'; barEl.classList.add('animate-pulse'); }
+    if (blkEl) blkEl.textContent = '0/0 blok';
+    if (solEl) solEl.textContent = 'Çözüm #0';
+    if (elpEl) elpEl.textContent = '0.0 sn';
+    if (liveElapsedTimer) clearInterval(liveElapsedTimer);
+    liveElapsedTimer = setInterval(() => {
+      if (!solverRunning) return;
+      const el = document.getElementById('m5LiveElapsed');
+      if (el) el.textContent = `${((Date.now() - liveStartMs) / 1000).toFixed(1)} sn`;
+    }, 400);
+  } else {
+    liveWatchSolution = null;
+    if (liveElapsedTimer) { clearInterval(liveElapsedTimer); liveElapsedTimer = null; }
+    if (barEl) barEl.classList.remove('animate-pulse');
+    if (prog) prog.classList.add('hidden');
   }
 }
 
@@ -3605,7 +3633,10 @@ function openManualPlaceModal(classId, cDayIdx, periodIdx) {
 function renderMenu5Templates() {
   const classes = getCurrentClasses();
   const teachers = getCurrentTeachers();
-  const placements = (state.solution && Array.isArray(state.solution.placements)) ? state.solution.placements : [];
+  const activeSol = (solverRunning && liveWatchSolution && Array.isArray(liveWatchSolution.placements))
+    ? liveWatchSolution
+    : state.solution;
+  const placements = (activeSol && Array.isArray(activeSol.placements)) ? activeSol.placements : [];
   const gridStats = getSlotStats();
   const { primary } = computeBellSchedule();
   const periods = state.grid.periodsPerDay;
@@ -5359,8 +5390,42 @@ function initDesktopBridge() {
       if (!solverRunning || !payload) return;
       const lbl = document.getElementById('m5ProgressLabel');
       if (lbl && payload.message) lbl.textContent = payload.message;
+      if (payload.type === 'live_snapshot' && Array.isArray(payload.placements)) {
+        liveWatchSolution = {
+          placements: payload.placements,
+          placed_blocks: payload.placed_blocks || payload.placements.length,
+          total_blocks: payload.total_blocks || payload.placements.length
+        };
+        const pct = Math.max(0, Math.min(100, Number(payload.percent || 0)));
+        const pctEl = document.getElementById('m5ProgressPct');
+        const barEl = document.getElementById('m5ProgressBarFill');
+        const blkEl = document.getElementById('m5LiveBlocks');
+        const solEl = document.getElementById('m5LiveSolutions');
+        if (pctEl) pctEl.textContent = `%${Math.round(pct)}`;
+        if (barEl) {
+          barEl.classList.remove('animate-pulse');
+          barEl.style.width = `${Math.max(5, pct)}%`;
+        }
+        if (blkEl) blkEl.textContent = `${liveWatchSolution.placed_blocks}/${liveWatchSolution.total_blocks} blok`;
+        if (solEl && payload.solution_count) solEl.textContent = `Çözüm #${payload.solution_count}`;
+        renderMenu5Templates();
+      }
     });
   }
+  document.querySelectorAll('.m5-live-tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tab = btn.getAttribute('data-live-tab');
+      if (!tab) return;
+      state.m5TplTab = tab;
+      document.querySelectorAll('.m5-tpl-btn').forEach((b) => {
+        const active = b.dataset.m5Tpl === tab;
+        b.classList.toggle('bg-indigo-600', active);
+        b.classList.toggle('text-white', active);
+        b.classList.toggle('border-indigo-600', active);
+      });
+      renderMenu5Templates();
+    });
+  });
   if (typeof api.onExportProgress === 'function') {
     api.onExportProgress((payload) => {
       if (!payload) return;

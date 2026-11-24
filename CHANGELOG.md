@@ -1,5 +1,10 @@
 # Sürüm Geçmişi (CHANGELOG)
 
+## [1.0.3] — 2026-11-24
+### Canlı Dağıtım İzleme (Live Watch)
+- **Gerçek Zamanlı Dağıtım Yüzdesi ve İlerleme Paneli:** OR-Tools CP-SAT `CpSolverSolutionCallback` ve Multi Solver motorlarından gelen gerçek ara çözümlerle yerleşen blok sayısı, gerçek dağıtım yüzdesi (`%0`–`%100`), bulunan çözüm sayısı ve geçen süre canlı olarak gösterilir.
+- **4 Görünümde Canlı Seyretme:** Dağıtım devam ederken **Sınıf Bazında**, **Öğretmen Bazında**, **Sınıf Çarşafı** ve **Öğretmen Çarşafı** görünümleri arasında tek tıkla geçiş yapılarak derslerin çizelgeye canlı yerleşmesi ve iyileşmesi izlenebilir (önceki kayıtlı program doğrulanmış sonuç gelene kadar güvenle korunur).
+
 ## [1.0.2] — 2026-11-24
 ### Kritik Düzeltme ve Kullanıcı Deneyimi İyileştirmeleri
 - **Çok Motorlu İmza Hatası Düzeltildi:** `electron/main.cjs` içindeki eski tek-motor imza kontrolü (`Çözücü beklenen google_ortools_cp_sat imzasını döndürmedi`) tüm 6 gerçek motoru (`ortools`, `timefold`, `choco`, `minizinc`, `scip`, `highs`, `multi_solver`) kabul edecek şekilde düzeltildi.

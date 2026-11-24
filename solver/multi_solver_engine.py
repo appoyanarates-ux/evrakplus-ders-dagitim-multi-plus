@@ -179,6 +179,23 @@ def _run_single_engine(
         "quality_score": (res.get("quality") or {}).get("quality_score", 0.0),
         "solve_time_sec": res.get("solve_time_sec", 0.0),
     })
+    if (res.get("validation") or {}).get("valid") and res.get("placements"):
+        placed_n = int(res.get("placed_blocks") or len(res["placements"]))
+        total_n = max(1, int(res.get("total_blocks") or placed_n))
+        pct_n = round((placed_n / total_n) * 100.0, 1)
+        emit_event({
+            "type": "live_snapshot",
+            "engine": res.get("engine") or engine_key,
+            "engine_key": engine_key,
+            "phase": "improving",
+            "placed_blocks": placed_n,
+            "total_blocks": total_n,
+            "percent": pct_n,
+            "quality_score": (res.get("quality") or {}).get("quality_score", 0.0),
+            "elapsed_sec": res.get("solve_time_sec", 0.0),
+            "message": f"{engine_key} tamamlandı — {placed_n}/{total_n} blok (%{pct_n}) · Kalite: {(res.get('quality') or {}).get('quality_score', 0)}/100",
+            "placements": res["placements"],
+        })
     return res
 
 
