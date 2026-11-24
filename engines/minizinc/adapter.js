@@ -9,7 +9,8 @@ import { generateDzn } from './dzn-generator.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
-const MODEL_PATH = path.join(__dirname, 'model.mzn');
+const PACKAGED_MODEL = process.resourcesPath ? path.join(process.resourcesPath, 'engines', 'minizinc', 'model.mzn') : '';
+const MODEL_PATH = (PACKAGED_MODEL && fs.existsSync(PACKAGED_MODEL)) ? PACKAGED_MODEL : path.join(__dirname, 'model.mzn');
 
 /**
  * Aynı motorun doğrudan ve MiniZinc üzerinden çalıştırılmasını iki bağımsız motor gibi

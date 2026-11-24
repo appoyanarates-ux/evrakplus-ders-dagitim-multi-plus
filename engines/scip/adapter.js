@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,7 +7,8 @@ import { evaluateSolution } from '../../packages/validator/src/index.js';
 import { resolvePythonBinary } from '../ortools/adapter.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SOLVER_SCRIPT = path.join(__dirname, 'solver_scip.py');
+const PACKAGED_SCRIPT = process.resourcesPath ? path.join(process.resourcesPath, 'engines', 'scip', 'solver_scip.py') : '';
+const SOLVER_SCRIPT = (PACKAGED_SCRIPT && fs.existsSync(PACKAGED_SCRIPT)) ? PACKAGED_SCRIPT : path.join(__dirname, 'solver_scip.py');
 
 export class ScipAdapter extends BaseSolverAdapter {
   constructor(options = {}) {

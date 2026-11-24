@@ -7,7 +7,8 @@ import { evaluateSolution } from '../../packages/validator/src/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
-const SOLVER_SCRIPT = path.join(__dirname, 'solver_cpsat.py');
+const PACKAGED_SCRIPT = process.resourcesPath ? path.join(process.resourcesPath, 'engines', 'ortools', 'solver_cpsat.py') : '';
+const SOLVER_SCRIPT = (PACKAGED_SCRIPT && fs.existsSync(PACKAGED_SCRIPT)) ? PACKAGED_SCRIPT : path.join(__dirname, 'solver_cpsat.py');
 
 /**
  * Gömülü Python çalışma ortamını öncelik sırasına göre bulur:
