@@ -16,4 +16,6 @@ resources/engines/*/bin/
 tmp/
 .tools/
 resources/engines/*/evrakplus-*.jar
+resources/engines/minizinc/
+
 
