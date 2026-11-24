@@ -1,0 +1,16 @@
+{
+  "name": "evrakplus-ders-dagitim-multi-plus",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EvrakPlus Ders Dağıtım Multi Plus — MEB uyumlu çok motorlu haftalık ders dağıtım sistemi",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/desktop-electron"
+  ],
+  "scripts": {
+    "test": "node --test tests/unit/*.test.js"
+  },
+  "author": "EvrakPlus",
+  "homepage": "https://www.evrakplus.com/ders-dagitim-multi-plus/"
+}

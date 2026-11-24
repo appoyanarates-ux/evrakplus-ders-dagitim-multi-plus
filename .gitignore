@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+out/
+*.log
+.venv/
+__pycache__/
+*.pyc
+target/
+.env
+.env.local
+resources/runtime/
+resources/engines/*/bin/
+*.sqlite
+*.db
+tmp/
