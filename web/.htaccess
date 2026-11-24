@@ -1,0 +1,19 @@
+# EvrakPlus Ders Dağıtım Multi Plus - cPanel Güvenlik Kuralları
+# Üst dizindeki WordPress kurulumuna müdahale etmez.
+
+<FilesMatch "^(config\.php|\.env|composer\.(json|lock))$">
+  Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "SAMEORIGIN"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP_HOST} !^localhost
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>

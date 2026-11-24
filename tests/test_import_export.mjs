@@ -11,7 +11,7 @@ const RENDERER_JS = path.join(ROOT, 'renderer', 'app.js');
 const RENDERER_CSS = path.join(ROOT, 'renderer', 'assets', 'styles.css');
 const MAIN_CJS = path.join(ROOT, 'electron', 'main.cjs');
 const PRELOAD_CJS = path.join(ROOT, 'electron', 'preload.cjs');
-const SOLVER_EXE = path.join(ROOT, 'dist', 'solver_ortools', 'solver_ortools.exe');
+const SOLVER_EXE = path.join(ROOT, 'resources', 'engines', 'ortools', 'multi_solver_engine.exe');
 
 test('Arayuzde dis CDN veya internet bagimliligi yok (100% offline)', () => {
   const html = fs.readFileSync(RENDERER_HTML, 'utf8');
@@ -49,10 +49,11 @@ test('Electron guvenlik ayarlari ve preload API siniri dogru', () => {
 test('Derlenmis Windows OR-Tools EXE (--info ve gercek cozum) calisiyor', () => {
   assert.ok(fs.existsSync(SOLVER_EXE), `PyInstaller ciktisi yok: ${SOLVER_EXE}`);
 
-  const infoRes = spawnSync(SOLVER_EXE, ['--info'], { encoding: 'utf8', shell: false });
+  const infoRes = spawnSync(SOLVER_EXE, ['--health-all'], { encoding: 'utf8', shell: false });
   assert.equal(infoRes.status, 0, infoRes.stderr);
-  const info = JSON.parse(infoRes.stdout);
-  assert.equal(info.engine, 'google_ortools_cp_sat');
+  const lastJsonLine = infoRes.stdout.trim().split(/\r?\n/).reverse().find((l) => l.trim().startsWith('{'));
+  const info = JSON.parse(lastJsonLine);
+  assert.equal(info.engines.ortools.engine, 'google_ortools_cp_sat');
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dd-exe-test-'));
   const inPath = path.join(tmpDir, 'in.json');
@@ -86,7 +87,7 @@ test('Derlenmis Windows OR-Tools EXE (--info ve gercek cozum) calisiyor', () => 
         room_id: null, room_type: 'standard', max_blocks_per_day: 1, use_common_elective_slot: false
       }],
       fixed_assignments: [],
-      solution_request: { mode: 'respect_locks', preference: 'balanced' },
+      solution_request: { mode: 'respect_locks', preference: 'balanced', multi_mode: 'single', engines: ['ortools'] },
       solver_config: { engine: 'google_ortools_cp_sat', max_time_seconds: 15 }
     };
     fs.writeFileSync(inPath, JSON.stringify(sampleModel), 'utf8');

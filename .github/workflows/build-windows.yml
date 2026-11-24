@@ -1,0 +1,36 @@
+name: Build Windows Setup & Portable EXE
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+      - name: Install & Build
+        run: |
+          npm ci
+          python -m venv .venv
+          .\.venv\Scripts\pip.exe install -r solver\requirements.txt
+          npm run build:solver
+          npm run build:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: release/*.exe

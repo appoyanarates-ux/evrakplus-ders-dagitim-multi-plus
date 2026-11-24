@@ -1,0 +1,32 @@
+name: Build cPanel Web, PWA & WordPress Connect
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Package Web, PWA, HTML Preview & WP Connect
+        run: |
+          npm ci
+          npm run prepare:renderer
+          npm run build:cpanel-zip
+          npm run build:wp-zip
+          npm run build:html-preview
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-packages
+          path: |
+            release/*cPanel.zip
+            release/*Connect*.zip
+            release/*HTML-Preview.html

@@ -1,0 +1,39 @@
+name: Test Suite (JS, Python, 6-Engine Multi Solver)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  test-all:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+      - name: Install Node & Python dependencies
+        run: |
+          npm ci
+          python -m venv .venv
+          .\.venv\Scripts\pip.exe install -r solver\requirements.txt
+      - name: Build Java Engines (Timefold & Choco)
+        run: |
+          cd engines/timefold && mvn -B -q clean package
+          cd ../choco && mvn -B -q clean package
+      - name: Run Python & JS Tests
+        run: |
+          .\.venv\Scripts\pytest.exe -v tests
+          npm run test:js

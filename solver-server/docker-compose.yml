@@ -1,0 +1,17 @@
+services:
+  evrakplus-solver-server:
+    build:
+      context: ..
+      dockerfile: solver-server/Dockerfile
+    container_name: evrakplus-multi-plus-solver
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      - PORT=8787
+      - SOLVER_SERVER_API_KEY=${SOLVER_SERVER_API_KEY:-change-me-in-production}
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 4G

@@ -1,0 +1,25 @@
+name: Build Solver Server Package
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-solver-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Package Solver Server ZIP
+        run: |
+          npm run build:solver-server-zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: solver-server-zip
+          path: release/*Solver-Server.zip
