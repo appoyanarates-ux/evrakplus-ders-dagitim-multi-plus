@@ -1,0 +1,251 @@
+name: Windows Release Build & Publish
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Kararlı sürümü GitHub Releases üzerine yayınla'
+        required: false
+        default: 'false'
+        type: boolean
+      publish_run_id:
+        description: 'Mevcut derleme artifact run ID (hızlı yayın)'
+        required: false
+        default: ''
+        type: string
+      release_tag:
+        description: 'Yayınlanacak etiket (ör. v1.0.7)'
+        required: false
+        default: ''
+        type: string
+      release_notes:
+        description: 'Sürüm açıklaması'
+        required: false
+        default: 'Geliştirmeler'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-verify:
+    name: Python OR-Tools & Electron Testleri
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_run_id == '' }}
+    runs-on: windows-latest
+    steps:
+      - name: Kaynak kodu al
+        uses: actions/checkout@v4
+
+      - name: Node.js 22 kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Python 3.12 kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Node bağımlılıklarını kilit dosyasına göre yükle
+        run: npm ci
+
+      - name: Python OR-Tools bağımlılıklarını yükle
+        run: |
+          python -m venv .venv
+          .venv\Scripts\python.exe -m pip install --upgrade pip
+          .venv\Scripts\pip.exe install -r solver\requirements.txt
+
+      - name: Python OR-Tools ve bağımsız doğrulama testleri
+        run: .venv\Scripts\pytest.exe -v tests
+
+      - name: Python yardımcı motorunu PyInstaller (onedir) ile paketle
+        run: powershell -ExecutionPolicy Bypass -File ./scripts/build_solver_windows.ps1
+
+      - name: Electron / EvrakPlus / Çıktı / Güncelleme testleri
+        run: npm run test:js
+
+      - name: Renderer varlıklarını ve simgeyi hazırla
+        run: |
+          node scripts/generate_icon.cjs
+          npm run prepare:renderer
+
+      - name: Derlenmiş OR-Tools paketini sonraki işe aktar
+        uses: actions/upload-artifact@v4
+        with:
+          name: solver-ortools-win64
+          path: dist/solver_ortools/
+          retention-days: 1
+
+  build-and-release:
+    name: Windows NSIS Paketleme, İmzalama ve Sürüm Yayını
+    needs: test-and-verify
+    runs-on: windows-latest
+    environment: production-release
+    permissions:
+      contents: write
+    steps:
+      - name: Kaynak kodu al
+        uses: actions/checkout@v4
+
+      - name: Node.js 22 kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Node bağımlılıklarını yükle
+        run: npm ci
+
+      - name: Derlenmiş OR-Tools motorunu indir
+        uses: actions/download-artifact@v4
+        with:
+          name: solver-ortools-win64
+          path: dist/solver_ortools/
+
+      - name: Renderer, PWA ve WordPress ZIP paketini hazırla
+        run: |
+          node scripts/generate_icon.cjs
+          npm run prepare:renderer
+          npm run build:wp-zip
+          npm run build:pwa-zip
+
+      - name: Kod imzalama sertifikası ve Ed25519 anahtar doğrulaması (Üretim yayınında zorunlu)
+        shell: pwsh
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          WIN_PUBLISHER_NAME: ${{ secrets.WIN_PUBLISHER_NAME }}
+          EPDD_ED25519_PRIVATE_KEY: ${{ secrets.EPDD_ED25519_PRIVATE_KEY }}
+          EPDD_ED25519_PUBLIC_KEY: ${{ secrets.EPDD_ED25519_PUBLIC_KEY }}
+        run: |
+          if (-not $env:CSC_LINK -or -not $env:CSC_KEY_PASSWORD -or -not $env:WIN_PUBLISHER_NAME -or -not $env:EPDD_ED25519_PRIVATE_KEY -or -not $env:EPDD_ED25519_PUBLIC_KEY) {
+            Write-Warning "Kod imzalama veya Ed25519 gizli anahtarları eksik! İmzasız aday paketi üretilecek; kararlı yayın durdurulacaktır."
+            "SIGNED_BUILD=false" >> $env:GITHUB_ENV
+          } else {
+            "SIGNED_BUILD=true" >> $env:GITHUB_ENV
+            $secObj = @{
+              note = "CI uretim derlemesi acik dogrulama bilgileri (ozel anahtar icermez)"
+              githubOwner = "${{ github.repository_owner }}"
+              githubRepo = "${{ github.event.repository.name }}"
+              expectedPublisherName = $env:WIN_PUBLISHER_NAME
+              ed25519ManifestPublicKeyPem = $env:EPDD_ED25519_PUBLIC_KEY
+            }
+            $secObj | ConvertTo-Json -Depth 4 | Set-Content -Path "electron/update_security.json" -Encoding UTF8
+          }
+
+      - name: Windows NSIS kurulum paketini üret
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          WIN_PUBLISHER_NAME: ${{ secrets.WIN_PUBLISHER_NAME }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ env.SIGNED_BUILD }}" = "true" ]; then
+            npx electron-builder --win --config electron-builder.yml --publish never -c.publish.owner="${{ github.repository_owner }}" -c.publish.repo="${{ github.event.repository.name }}" -c.win.publisherName="${WIN_PUBLISHER_NAME}"
+          else
+            npx electron-builder --win --config electron-builder.yml --publish never
+          fi
+        shell: bash
+
+      - name: Ed25519 güncelleme manifesti imzası oluştur (latest.yml.sig)
+        if: env.SIGNED_BUILD == 'true'
+        shell: pwsh
+        env:
+          EPDD_ED25519_PRIVATE_KEY: ${{ secrets.EPDD_ED25519_PRIVATE_KEY }}
+        run: |
+          if ($env:EPDD_ED25519_PRIVATE_KEY -and (Test-Path "release/latest.yml")) {
+            node scripts/sign_manifest.cjs release/latest.yml release/latest.yml.sig
+          } else {
+            Write-Error "Üretim sürümü için EPDD_ED25519_PRIVATE_KEY ve release/latest.yml zorunludur."
+            exit 1
+          }
+
+      - name: Kurulum dosyası ve SHA-256 bütünlük kontrolü
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem release\EvrakPlus-Ders-Dagitim-Setup-*.exe | Select-Object -First 1
+          if (-not $exe) { Write-Error "NSIS kurulum dosyası bulunamadı!"; exit 1 }
+          Get-FileHash $exe.FullName -Algorithm SHA256 | Format-List
+
+      - name: Sürüm paketlerini artifact olarak sakla
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-artifacts
+          path: |
+            release/EvrakPlus-Ders-Dagitim-Setup-*.exe
+            release/EvrakPlus-Ders-Dagitim-Setup-*.exe.blockmap
+            release/latest.yml
+            release/latest.yml.sig
+            release/evrakplus-ders-dagitim-pwa-*.zip
+            release/evrakplus-ders-dagitim-bridge-*.zip
+          retention-days: 14
+
+      - name: GitHub Releases üzerine sürüm yayınla
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: EvrakPlus Ders Dağıtım ${{ github.ref_name }}
+          body: Geliştirmeler
+          draft: false
+          prerelease: false
+          files: |
+            release/EvrakPlus-Ders-Dagitim-Setup-*.exe
+            release/EvrakPlus-Ders-Dagitim-Setup-*.exe.blockmap
+            release/latest.yml
+            release/latest.yml.sig
+            release/evrakplus-ders-dagitim-pwa-*.zip
+            release/evrakplus-ders-dagitim-bridge-*.zip
+
+  publish-existing-artifacts:
+    name: Mevcut Derlemeyi GitHub Releases Üzerinde Yayınla
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_run_id != '' && inputs.release_tag != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Kaynak kodu al
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+
+      - name: Node.js 22 kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Mevcut Windows derleme paketlerini indir
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release-artifacts
+          run-id: ${{ inputs.publish_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: release
+
+      - name: PWA ZIP paketini oluştur
+        run: |
+          VER="${{ inputs.release_tag }}"
+          VER="${VER#v}"
+          node scripts/create_zip.cjs --strip-prefix renderer "release/evrakplus-ders-dagitim-pwa-${VER}.zip" renderer
+          ls -la release
+
+      - name: GitHub Release yayınla
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: EvrakPlus Ders Dağıtım ${{ inputs.release_tag }}
+          body: ${{ inputs.release_notes }}
+          draft: false
+          prerelease: false
+          files: |
+            release/EvrakPlus-Ders-Dagitim-Setup-*.exe
+            release/EvrakPlus-Ders-Dagitim-Setup-*.exe.blockmap
+            release/latest.yml
+            release/latest.yml.sig
+            release/evrakplus-ders-dagitim-pwa-*.zip
+            release/evrakplus-ders-dagitim-bridge-*.zip

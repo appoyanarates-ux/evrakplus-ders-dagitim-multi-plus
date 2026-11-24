@@ -1,0 +1,7 @@
+{
+  "note": "Bu dosya YALNIZCA acik (public) dogrulama meta verilerini icerir. Hicbir ozel anahtar veya sertifika parolasi icermez.",
+  "githubOwner": "appoyanarates-ux",
+  "githubRepo": "ders-dagitim-ultimate",
+  "expectedPublisherName": "",
+  "ed25519ManifestPublicKeyPem": ""
+}

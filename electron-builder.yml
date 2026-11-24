@@ -1,0 +1,49 @@
+appId: com.evrakplus.dersdagitim
+productName: EvrakPlus Ders Dagitim
+copyright: Copyright © 2026 EvrakPlus
+directories:
+  output: release
+  buildResources: build
+files:
+  - electron/**/*
+  - renderer/**/*
+  - package.json
+  - "!renderer/assets/input.css"
+extraResources:
+  - from: dist/solver_ortools
+    to: solver_ortools
+    filter:
+      - "**/*"
+win:
+  icon: build/icon.ico
+  verifyUpdateCodeSignature: false
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: "EvrakPlus-Ders-Dagitim-Setup-${version}.exe"
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  runAfterFinish: true
+  shortcutName: "EvrakPlus Ders Dağıtım"
+  uninstallDisplayName: "EvrakPlus Ders Dağıtım ${version}"
+  deleteAppDataOnUninstall: false
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  include: build/installer.nsh
+  installerLanguages:
+    - tr_TR
+    - en_US
+  language: "1055"
+publish:
+  - provider: github
+    owner: appoyanarates-ux
+    repo: ders-dagitim-ultimate
+    releaseType: release
+    vPrefixedTagName: true

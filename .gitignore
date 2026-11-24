@@ -1,0 +1,64 @@
+# Dependencies & Build Outputs
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+build_pyinstaller/
+release/
+releases/
+reference/
+*.log
+target/
+*.class
+*.jar
+!resources/licenses/**
+
+# Embedded Native Runtimes & Heavy Binaries (managed via build scripts & releases)
+resources/engines/ortools/
+resources/engines/timefold/*.jar
+resources/engines/choco/*.jar
+resources/engines/minizinc/
+resources/engines/scip/
+resources/engines/highs/
+resources/runtime/
+*.exe
+*.dll
+*.zip
+*.blockmap
+
+# Security & Secrets (NEVER committed!)
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+*.jks
+evrakplus_session.enc
+*token*
+*secret*
+*password*
+
+# User School Projects, Databases & Backups (KVKK)
+backups/
+recovery/
+logs/
+*.school.json
+*.sqlite
+*.sqlite3
+*.db
+user_projects/
+web/config.php
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
