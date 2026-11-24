@@ -1,0 +1,51 @@
+﻿<div class="app">
+    <aside class="side">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 34 34" aria-hidden="true">
+          <rect x="1" y="1" width="32" height="32" rx="9" fill="#d42a38"/>
+          <g fill="#fff">
+            <rect x="7" y="8" width="6" height="5" rx="1.5"/>
+            <rect x="14" y="8" width="6" height="5" rx="1.5" opacity=".55"/>
+            <rect x="21" y="8" width="6" height="5" rx="1.5"/>
+            <rect x="7" y="15" width="6" height="5" rx="1.5" opacity=".55"/>
+            <rect x="14" y="15" width="13" height="5" rx="1.5"/>
+            <rect x="7" y="22" width="13" height="5" rx="1.5"/>
+            <rect x="21" y="22" width="6" height="5" rx="1.5" opacity=".55"/>
+          </g>
+        </svg>
+        <div>
+          <b>EvrakPlus Multi Plus</b>
+          <small>v1.0.0 Â· 6 Motorlu DaÄŸÄ±tÄ±m</small>
+        </div>
+      </div>
+      <nav class="menu" id="sideMenu" aria-label="Ana menÃ¼"></nav>
+      <div class="sidefoot">
+        EvrakPlus Ders DaÄŸÄ±tÄ±m Multi Plus v1.0.0<br>
+        <a href="https://www.evrakplus.com/" target="_blank" rel="noopener" style="color:inherit">evrakplus.com</a>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="top">
+        <span class="nm" id="topSchoolName">EvrakPlus Ders DaÄŸÄ±tÄ±m Multi Plus</span>
+        <span class="pill" id="topStatus">HazÄ±r</span>
+        <span class="pill" id="topRuntime">TarayÄ±cÄ± Modu</span>
+        <span class="sp"></span>
+        <button class="btn sm ghost" id="btnUndo" title="Geri al (Ctrl+Z)">Geri al</button>
+        <button class="btn sm ghost" id="btnRedo" title="Yinele (Ctrl+Y)">Yinele</button>
+        <button class="btn sm" id="btnInstallPwa" style="display:none">UygulamayÄ± YÃ¼kle</button>
+        <button class="btn sm" id="btnQuickBackup">JSON Yedek</button>
+      </header>
+      <main class="view" id="view"></main>
+    </div>
+  </div>
+
+  <nav class="mob-nav" id="mobNav" aria-label="Mobil hÄ±zlÄ± menÃ¼">
+    <button data-nav="dashboard">Panel</button>
+    <button data-nav="auto_schedule">DaÄŸÄ±tÄ±m</button>
+    <button data-nav="manual_schedule">Manuel</button>
+    <button data-nav="timetables">Program</button>
+    <button data-nav="reports">Ã‡Ä±ktÄ±</button>
+  </nav>
+
+  <div id="modalRoot"></div>
