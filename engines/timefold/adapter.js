@@ -254,6 +254,7 @@ export class TimefoldAdapter extends BaseSolverAdapter {
         });
       });
 
+      proc.stdin.on('error', () => {});
       proc.stdin.write(JSON.stringify(solverInput));
       proc.stdin.end();
     });

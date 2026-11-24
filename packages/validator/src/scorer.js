@@ -16,12 +16,12 @@ export function evaluateSolution(solverInput, placements, rawStatus) {
   const validation = validateSchedule(solverInput, placements, rawStatus);
   const m = validation.metrics;
 
-  // Geçersiz (zorunlu kural ihlalli) çözüm asla yüksek kalite puanı alamaz
-  if (!validation.isHardValid) {
+  // Geçersiz (zorunlu kural ihlalli) veya hiç ders atanmamış çözüm asla kalite puanı alamaz
+  if (!validation.isHardValid || m.assignedBlocks === 0) {
     return {
       validation,
       qualityScore: 0,
-      rankTier: 0, // 0 = geçersiz, 1 = kısmi geçerli, 2 = tam geçerli
+      rankTier: 0, // 0 = geçersiz/boş, 1 = kısmi geçerli, 2 = tam geçerli
       breakdown: {
         completionScore: 0,
         preferenceScore: 0,
