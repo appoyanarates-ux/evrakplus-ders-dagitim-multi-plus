@@ -3,6 +3,8 @@ export { OrToolsAdapter, resolvePythonBinary } from '../../../engines/ortools/ad
 export { TimefoldAdapter, resolveJavaBinary, resolveTimefoldJar } from '../../../engines/timefold/adapter.js';
 export { ChocoAdapter, resolveChocoJar } from '../../../engines/choco/adapter.js';
 export { MiniZincAdapter, resolveMiniZincBinary } from '../../../engines/minizinc/adapter.js';
+export { ScipAdapter } from '../../../engines/scip/adapter.js';
+
 
 
 
