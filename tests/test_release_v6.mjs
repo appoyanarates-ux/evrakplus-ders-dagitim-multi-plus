@@ -242,7 +242,7 @@ test('Aşama 6.4: Başlangıç kontrolleri, .gitignore, POSIX WP ZIP ve boş PAT
     }
 
     const builderYml = fs.readFileSync(path.join(projectRoot, 'electron-builder.yml'), 'utf8');
-    assert.ok(builderYml.includes('DersOptime-Haftalik-Ders-Dagitim-Programi-${version}-Setup.${ext}'));
+    assert.ok(builderYml.includes('DersOptima-Pro-Haftalik-Ders-Dagitim-Programi-${version}-Setup.${ext}'));
     assert.ok(builderYml.includes('deleteAppDataOnUninstall: false'));
     assert.ok(builderYml.includes('owner: appoyanarates-ux'));
     assert.ok(builderYml.includes('repo: evrakplus-ders-dagitim-multi-plus'));

@@ -1,7 +1,7 @@
 {
   "id": "/ders-dagitim-multi-plus/",
-  "name": "DersOptime Haftalık Ders Dağıtım Programı",
-  "short_name": "DersOptime",
+  "name": "DersOptima Pro Haftalık Ders Dağıtım Programı",
+  "short_name": "DersOptima Pro",
   "description": "MEB 2026-2027 Altı Motorlu Haftalık Ders Dağıtım, Nöbet ve Okul Kulübü Programı",
   "start_url": "./index.html",
   "scope": "./",

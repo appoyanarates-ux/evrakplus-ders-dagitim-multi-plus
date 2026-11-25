@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>DersOptime Haftalık Ders Dağıtım Programı — cPanel Kurulum Sihirbazı</title>
+  <title>DersOptima Pro Haftalık Ders Dağıtım Programı — cPanel Kurulum Sihirbazı</title>
   <style>
     body{font-family:system-ui,-apple-system,sans-serif;background:#f8fafc;color:#0f172a;margin:0;padding:24px}
     .card{max-width:720px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 4px 16px rgba(15,23,42,.06)}
@@ -106,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
   <div class="card">
-    <h1>DersOptime Haftalık Ders Dağıtım Programı v1.0.4 — Kurulum Sihirbazı</h1>
+    <h1>DersOptima Pro Haftalık Ders Dağıtım Programı v1.0.4 — Kurulum Sihirbazı</h1>
     <p>Bu kurulum mevcut WordPress sitenize ve diğer uygulamalara müdahale etmeden yalnızca bu dizinde çalışır.</p>
     <h3>Sistem Kontrolleri</h3>
     <ul>

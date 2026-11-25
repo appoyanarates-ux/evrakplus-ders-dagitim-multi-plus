@@ -32,7 +32,7 @@
     if (statusText && st.message) statusText.textContent = st.message;
 
     if (st.status === 'available') {
-      if (el('updModalSubtitle')) el('updModalSubtitle').textContent = `DersOptime Haftalık Ders Dağıtım Programı ${st.availableVersion || ''}`;
+      if (el('updModalSubtitle')) el('updModalSubtitle').textContent = `DersOptima Pro Haftalık Ders Dağıtım Programı ${st.availableVersion || ''}`;
       if (el('updCurrentVer')) el('updCurrentVer').textContent = st.currentVersion || '1.0.0';
       if (el('updNewVer')) el('updNewVer').textContent = st.availableVersion || '—';
       if (el('updReleaseNotesBox')) {

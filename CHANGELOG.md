@@ -1,5 +1,9 @@
 # Sürüm Geçmişi (CHANGELOG)
 
+## [1.0.5] — 2026-11-25
+### Marka Düzeltmesi
+- Program adı **DersOptima Pro Haftalık Ders Dağıtım Programı** olarak güncellendi (masaüstü kurulum/taşınabilir EXE, kısayol, pencere başlığı, kenar çubuğu, Mobil PWA ve cPanel Web paketi).
+
 ## [1.0.4] — 2026-11-25
 ### Marka Güncellemesi
 - **Yeni Ürün Adı:** Program adı **DersOptime Haftalık Ders Dağıtım Programı** olarak güncellendi (pencere başlığı, kenar çubuğu, mobil PWA, kurulum sihirbazı, masaüstü kısayolu, Setup/Portable EXE ve cPanel/Web paketleri). Mevcut EvrakPlus üyelik sistemi ve kayıtlı okul projeleriyle %100 geriye uyumludur.
