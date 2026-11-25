@@ -1241,6 +1241,27 @@ function renderCourseRow(c) {
   `;
 }
 
+function normalizeCourseKeyName(name) {
+  return String(name || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase('tr-TR');
+}
+
+function findDuplicateCourseInClass(cls, code, name, excludeCourseId = null) {
+  if (!cls || !Array.isArray(cls.courses)) return null;
+  const normCode = String(code || '').trim().toUpperCase();
+  const normName = normalizeCourseKeyName(name);
+  return cls.courses.find((c) => {
+    if (excludeCourseId && c.id === excludeCourseId) return false;
+    const cCode = String(c.code || '').trim().toUpperCase();
+    const cName = normalizeCourseKeyName(c.name);
+    if (normCode && cCode && cCode === normCode) return true;
+    if (normName && cName && cName === normName) return true;
+    return false;
+  }) || null;
+}
+
 function renderMenu2() {
   ensureState(state);
   const meta = MEB_SCHOOL_TYPES[state.school.schoolTypeId];
@@ -1451,7 +1472,7 @@ function renderMenu2() {
     if (!activeCls.courses) activeCls.courses = [];
     let added = 0;
     templates.forEach((t) => {
-      if (!activeCls.courses.some((c) => c.code === t.code && c.category === t.category)) {
+      if (!findDuplicateCourseInClass(activeCls, t.code, t.name)) {
         activeCls.courses.push({ ...t, id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) });
         added++;
       }
@@ -1468,8 +1489,12 @@ function renderMenu2() {
   const btnCopyPeers = document.getElementById('btnCopyCoursesPeers');
   if (btnCopyPeers) {
     btnCopyPeers.addEventListener('click', () => {
+      const uniqueSrc = [];
+      (activeCls.courses || []).forEach((c) => {
+        if (!findDuplicateCourseInClass({ courses: uniqueSrc }, c.code, c.name)) uniqueSrc.push(c);
+      });
       peers.forEach((p) => {
-        p.courses = JSON.parse(JSON.stringify(activeCls.courses || [])).map((c) => ({ ...c, id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) }));
+        p.courses = JSON.parse(JSON.stringify(uniqueSrc)).map((c) => ({ ...c, id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) }));
       });
       saveState(); renderMenu2();
       showToast(`Dersler ${peers.length} şubeye kopyalandı`);
@@ -1721,6 +1746,11 @@ function renderElectivePickerList() {
     const existingIdx = activeCls.courses.findIndex((c) => c.code === t.code && c.category === 'secmeli');
     if (existingIdx >= 0) activeCls.courses.splice(existingIdx, 1);
     else {
+      const dup = findDuplicateCourseInClass(activeCls, t.code, t.name);
+      if (dup) {
+        showToast(`${activeCls.name} şubesinde "${dup.name}" dersi zaten tanımlı! Bir sınıfa aynı ders birden fazla kez verilemez.`);
+        return;
+      }
       activeCls.courses.push({
         ...t, id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
         hours: chosenH, blocks: defaultBlocksForHours(chosenH), blockMode: 'auto'
@@ -2487,12 +2517,15 @@ function executeM4Transfer(unassignOnly = false) {
   const dstTeacher = targetId ? teachers.find((t) => t.id === targetId) : null;
   let movedCount = 0;
 
+  let unplacedCount = 0;
   if (m4TransferContext.mode === 'bulk') {
     const srcId = m4TransferContext.sourceTeacherId;
     classes.forEach((cls) => {
       (cls.courses || []).forEach((c) => {
-        if (c.teacherId === srcId) { c.teacherId = targetId; movedCount++; }
-        if (c.splitGroups && c.teacherId2 === srcId) { c.teacherId2 = targetId; movedCount++; }
+        let changed = false;
+        if (c.teacherId === srcId) { c.teacherId = targetId; movedCount++; changed = true; }
+        if (c.splitGroups && c.teacherId2 === srcId) { c.teacherId2 = targetId; movedCount++; changed = true; }
+        if (changed) unplacedCount += unplaceAssignmentFromSolution(cls.id, c.id);
       });
     });
   } else {
@@ -2501,19 +2534,22 @@ function executeM4Transfer(unassignOnly = false) {
     if (c) {
       if (m4TransferContext.slot === 2) c.teacherId2 = targetId;
       else c.teacherId = targetId;
+      unplacedCount += unplaceAssignmentFromSolution(cls.id, c.id);
       movedCount = 1;
     }
   }
 
   if (movedCount > 0) {
-    if (targetId) m4ExpandedTeacherIds.add(targetId);
+    if (targetId && window._m4CollapsedTeacherIds) window._m4CollapsedTeacherIds.delete(targetId);
+    if (targetId && typeof m4ExpandedTeacherIds !== 'undefined') m4ExpandedTeacherIds.add(targetId);
     saveState();
     closeM4TransferModal();
     renderMenu4();
+    const unpNote = unplacedCount > 0 ? ` (${unplacedCount} yerleşim boşa düşürüldü)` : '';
     showToast(
       unassignOnly
-        ? `${movedCount} ders ataması kaldırıldı (boşa çıkarıldı)`
-        : `${movedCount} ders ${dstTeacher ? dstTeacher.name : 'yeni öğretmene'} aktarıldı`
+        ? `${movedCount} ders ataması kaldırıldı (boşa çıkarıldı)${unpNote}`
+        : `${movedCount} ders ${dstTeacher ? dstTeacher.name : 'yeni öğretmene'} aktarıldı${unpNote}`
     );
   } else {
     closeM4TransferModal();
@@ -2747,12 +2783,47 @@ function renderMenu4() {
 
   if (loadCountBadge) loadCountBadge.textContent = `${filteredTeachers.length} / ${teachers.length}`;
 
+  if (!window._m4SelectedLoadKeys) window._m4SelectedLoadKeys = new Set();
+  if (!window._m4CollapsedTeacherIds) window._m4CollapsedTeacherIds = new Set();
+  const selLoadKeys = window._m4SelectedLoadKeys;
+  const collapsedTIds = window._m4CollapsedTeacherIds;
+
+  // Geçersiz seçimleri temizle
+  const validLoadKeySet = new Set();
+  teachers.forEach((t) => {
+    const info = loadMap[t.id] || { assignments: [] };
+    info.assignments.forEach((a) => validLoadKeySet.add(`${t.id}::${a.classId}::${a.courseId}::${a.slot}`));
+  });
+  for (const k of Array.from(selLoadKeys)) {
+    if (!validLoadKeySet.has(k)) selLoadKeys.delete(k);
+  }
+
   if (teachers.length === 0) {
     loadListEl.innerHTML = `<div class="py-6 text-center text-xs text-slate-400">Henüz öğretmen eklenmedi.</div>`;
   } else if (filteredTeachers.length === 0) {
     loadListEl.innerHTML = `<div class="py-6 text-center text-xs text-slate-400">Filtreye uyan öğretmen bulunamadı.</div>`;
   } else {
-    loadListEl.innerHTML = filteredTeachers.map((t) => {
+    const bulkBarHtml = selLoadKeys.size > 0 ? `
+      <div class="sticky top-0 z-10 rounded-xl border border-indigo-300 bg-indigo-50/95 backdrop-blur p-2.5 shadow-sm space-y-2 mb-2">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span class="text-xs font-extrabold text-indigo-900">${selLoadKeys.size} ders seçildi</span>
+          <button type="button" id="btnM4BulkClearSel" class="text-[11px] font-semibold text-slate-600 hover:text-slate-900 underline">Seçimi Temizle</button>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <select id="m4BulkTargetTeacher" class="flex-1 min-w-[140px] px-2 py-1.5 rounded-lg border border-indigo-200 bg-white text-[11px] font-semibold text-slate-800">
+            <option value="">Hedef öğretmen seçin...</option>
+            ${teachers.map((tt) => {
+              const li = loadMap[tt.id] ? loadMap[tt.id].totalHours : 0;
+              return `<option value="${tt.id}">${escapeHtml(tt.name)} (${escapeHtml(tt.branch)} · ${li}/${tt.maxHours || 30}s)</option>`;
+            }).join('')}
+          </select>
+          <button type="button" id="btnM4BulkTransferSelected" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold transition">Aktar</button>
+          <button type="button" id="btnM4BulkRemoveSelected" class="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold transition">Öğretmenlerden Al</button>
+        </div>
+      </div>
+    ` : '';
+
+    loadListEl.innerHTML = bulkBarHtml + filteredTeachers.map((t) => {
       const info = loadMap[t.id] || { totalHours: 0, coursesSummary: {}, crossBranchHours: 0, assignments: [] };
       const maxH = Math.max(1, Number(t.maxHours) || 30);
       const minH = Number(t.minHours) || 1;
@@ -2761,7 +2832,7 @@ function renderMenu4() {
       const isEmpty = info.totalHours === 0;
       const isBelowMin = !isEmpty && info.totalHours < minH;
       const remaining = maxH - info.totalHours;
-      const isExpanded = m4ExpandedTeacherIds.has(t.id);
+      const isExpanded = !collapsedTIds.has(t.id);
 
       const avatarCls = isOver
         ? 'bg-rose-600 text-white'
@@ -2777,67 +2848,90 @@ function renderMenu4() {
           ? `<span class="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-semibold">Derssiz</span>`
           : `<span class="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-semibold">${remaining > 0 ? `+${remaining}s boş` : 'Tam dolu'}</span>`;
 
-      const collapsedChips = info.assignments.slice(0, 4).map((a) =>
-        `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] text-slate-700"><strong class="text-indigo-700">${escapeHtml(a.className)}</strong> ${escapeHtml(a.courseName)} <span class="text-slate-400">(${a.hours}s)</span></span>`
-      ).join('') + (info.assignments.length > 4 ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-semibold">+${info.assignments.length - 4} ders</span>` : '');
+      const tAllKeys = info.assignments.map((a) => `${t.id}::${a.classId}::${a.courseId}::${a.slot}`);
+      const allSelected = tAllKeys.length > 0 && tAllKeys.every((k) => selLoadKeys.has(k));
 
       const expandedRows = info.assignments.length === 0
-        ? `<div class="py-3 text-center text-[11px] text-slate-400">Bu öğretmene henüz ders atanmamış.</div>`
-        : info.assignments.map((a) => `
-          <div class="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg bg-white border border-slate-200/80 hover:border-indigo-300 transition">
-            <div class="min-w-0 flex items-center gap-1.5">
+        ? `<div class="py-2 text-center text-[11px] text-slate-400">Bu öğretmene henüz ders atanmamış.</div>`
+        : info.assignments.map((a) => {
+          const k = `${t.id}::${a.classId}::${a.courseId}::${a.slot}`;
+          const checked = selLoadKeys.has(k);
+          const blkText = (Array.isArray(a.blocks) && a.blocks.length ? a.blocks : [a.hours]).join('+');
+          return `
+          <div class="flex items-center justify-between gap-1.5 py-1.5 px-2 rounded-lg border transition ${checked ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200/80 hover:border-indigo-300'}">
+            <label class="min-w-0 flex items-center gap-1.5 flex-1 cursor-pointer">
+              <input type="checkbox" class="m4-load-chk rounded border-slate-300 text-indigo-600 shrink-0" data-load-key="${escapeHtml(k)}" ${checked ? 'checked' : ''} />
               <span class="shrink-0 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px]">${escapeHtml(a.className)}</span>
               <div class="min-w-0">
                 <div class="text-[11px] font-semibold text-slate-800 truncate">${escapeHtml(a.courseName)}${a.slot === 2 ? ' <span class="text-[9px] text-indigo-600">(2.Grup)</span>' : ''}</div>
-                <div class="text-[10px] text-slate-400">${a.hours} sa · (${a.blocks.join('+')})${a.isCross ? ' · <span class="text-teal-700 font-semibold">Branş dışı</span>' : ''}</div>
-              </div>
-            </div>
-            <button type="button"
-              class="m4-transfer-one shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white text-[10px] font-bold transition"
-              data-src-tid="${t.id}" data-cls-id="${a.classId}" data-cls-name="${escapeHtml(a.className)}"
-              data-crs-id="${a.courseId}" data-crs-code="${escapeHtml(a.courseCode)}" data-crs-name="${escapeHtml(a.courseName)}"
-              data-hrs="${a.hours}" data-slot="${a.slot}" title="Bu dersi başka öğretmene aktar">
-              <i data-lucide="arrow-left-right" class="w-3 h-3"></i> Aktar
-            </button>
-          </div>
-        `).join('');
-
-      return `
-        <div class="rounded-xl border transition-all ${isOver ? 'border-rose-300 bg-rose-50/40' : (isExpanded ? 'border-indigo-300 bg-indigo-50/20 shadow-xs' : 'border-slate-200 bg-slate-50/50 hover:border-slate-300')}">
-          <button type="button" data-toggle-tid="${t.id}" class="m4-load-toggle w-full text-left p-3 space-y-2">
-            <div class="flex items-start justify-between gap-2">
-              <div class="flex items-center gap-2.5 min-w-0">
-                <div class="w-8 h-8 rounded-lg ${avatarCls} flex items-center justify-center text-[11px] font-bold shrink-0 shadow-xs">${escapeHtml(getTeacherInitials(t.name))}</div>
-                <div class="min-w-0">
-                  <div class="text-xs font-bold text-slate-900 truncate">${escapeHtml(t.name)}</div>
-                  <div class="text-[10px] text-slate-500 truncate">${escapeHtml(t.branch)}${info.crossBranchHours > 0 ? ` · <span class="text-teal-700 font-semibold">${info.crossBranchHours}s branş dışı</span>` : ''}</div>
+                <div class="text-[10px] text-slate-500 flex flex-wrap items-center gap-1">
+                  <span class="font-bold text-slate-700">${a.hours} sa</span>
+                  <span class="px-1 py-0.2 rounded bg-slate-100 text-slate-700 font-mono text-[9px] font-bold">Blok: ${blkText}</span>
+                  ${a.isCross ? '<span class="text-teal-700 font-semibold">· Branş dışı</span>' : ''}
                 </div>
               </div>
-              <div class="flex flex-col items-end shrink-0 gap-0.5">
+            </label>
+            <div class="flex items-center gap-1 shrink-0">
+              <button type="button"
+                class="m4-transfer-one inline-flex items-center gap-0.5 px-1.5 py-1 rounded-md bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white text-[10px] font-bold transition"
+                data-src-tid="${t.id}" data-cls-id="${a.classId}" data-cls-name="${escapeHtml(a.className)}"
+                data-crs-id="${a.courseId}" data-crs-code="${escapeHtml(a.courseCode)}" data-crs-name="${escapeHtml(a.courseName)}"
+                data-hrs="${a.hours}" data-slot="${a.slot}" title="Dersi başka öğretmene değiştir/aktar">
+                Değiştir
+              </button>
+              <button type="button"
+                class="m4-unassign-one inline-flex items-center px-1.5 py-1 rounded-md bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white text-[10px] font-bold transition"
+                data-src-tid="${t.id}" data-cls-id="${a.classId}" data-crs-id="${a.courseId}" data-slot="${a.slot}"
+                title="Bu dersi öğretmenden al / sil">
+                Al
+              </button>
+            </div>
+          </div>`;
+        }).join('');
+
+      return `
+        <div class="rounded-xl border transition-all ${isOver ? 'border-rose-300 bg-rose-50/40' : 'border-slate-200 bg-slate-50/60 hover:border-indigo-300'}">
+          <div class="p-3 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0 flex-1">
+                ${info.assignments.length > 0 ? `<input type="checkbox" class="m4-load-select-all-t rounded border-slate-300 text-indigo-600 shrink-0" data-selall-tid="${t.id}" title="Bu öğretmenin tüm derslerini seç" ${allSelected ? 'checked' : ''} />` : ''}
+                <button type="button" data-toggle-tid="${t.id}" class="m4-load-toggle flex items-center gap-2 min-w-0 flex-1 text-left">
+                  <div class="w-8 h-8 rounded-lg ${avatarCls} flex items-center justify-center text-[11px] font-bold shrink-0 shadow-xs">${escapeHtml(getTeacherInitials(t.name))}</div>
+                  <div class="min-w-0">
+                    <div class="text-xs font-bold text-slate-900 truncate">${escapeHtml(t.name)}</div>
+                    <div class="text-[10px] text-slate-500 truncate">${escapeHtml(t.branch)} · ${info.assignments.length} ders${info.crossBranchHours > 0 ? ` · <span class="text-teal-700 font-semibold">${info.crossBranchHours}s branş dışı</span>` : ''}</div>
+                  </div>
+                </button>
+              </div>
+              <button type="button" data-toggle-tid="${t.id}" class="m4-load-toggle flex flex-col items-end shrink-0 gap-0.5">
                 <div class="flex items-center gap-1">
                   <span class="text-xs font-extrabold ${isOver ? 'text-rose-600' : 'text-slate-900'}">${info.totalHours}<span class="text-[10px] font-medium text-slate-400">/${maxH}s</span></span>
                   <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-3.5 h-3.5 text-slate-400"></i>
                 </div>
                 ${statusBadge}
-              </div>
+              </button>
             </div>
             <div class="w-full h-1.5 bg-slate-200/80 rounded-full overflow-hidden">
               <div class="h-full ${barColor} rounded-full transition-all" style="width: ${ratio}%;"></div>
             </div>
-            ${!isExpanded ? (collapsedChips ? `<div class="flex flex-wrap gap-1 pt-0.5">${collapsedChips}</div>` : `<div class="text-[10px] text-slate-400">Henüz ders atanmadı</div>`) : ''}
-          </button>
+          </div>
           ${isExpanded ? `
             <div class="px-3 pb-3 pt-1 border-t border-slate-200/70 space-y-2">
               <div class="space-y-1.5">${expandedRows}</div>
-              <div class="flex items-center justify-between gap-1.5 pt-1.5 border-t border-slate-200/60">
+              <div class="flex flex-wrap items-center justify-between gap-1.5 pt-1.5 border-t border-slate-200/60">
                 <button type="button" data-filter-tname="${escapeHtml(t.name)}" class="m4-filter-teacher inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-[10px] font-semibold text-slate-700 transition">
                   <i data-lucide="filter" class="w-3 h-3"></i> Tabloda Göster
                 </button>
-                ${info.assignments.length > 0 ? `
-                  <button type="button" data-bulk-tid="${t.id}" class="m4-transfer-bulk inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold shadow-xs transition">
-                    <i data-lucide="repeat" class="w-3 h-3"></i> Tümünü Aktar (${info.assignments.length})
-                  </button>
-                ` : ''}
+                <div class="flex items-center gap-1">
+                  ${info.assignments.length > 0 ? `
+                    <button type="button" data-unassign-all-tid="${t.id}" class="m4-unassign-all inline-flex items-center gap-1 px-2 py-1 rounded-md bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white text-[10px] font-bold transition">
+                      Tümünü Al
+                    </button>
+                    <button type="button" data-bulk-tid="${t.id}" class="m4-transfer-bulk inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold shadow-xs transition">
+                      <i data-lucide="repeat" class="w-3 h-3"></i> Tümünü Aktar (${info.assignments.length})
+                    </button>
+                  ` : ''}
+                </div>
               </div>
             </div>
           ` : ''}
@@ -2847,10 +2941,95 @@ function renderMenu4() {
 
     loadListEl.querySelectorAll('.m4-load-toggle').forEach((btn) => btn.addEventListener('click', () => {
       const tid = btn.dataset.toggleTid;
-      if (m4ExpandedTeacherIds.has(tid)) m4ExpandedTeacherIds.delete(tid);
-      else m4ExpandedTeacherIds.add(tid);
+      if (collapsedTIds.has(tid)) collapsedTIds.delete(tid);
+      else collapsedTIds.add(tid);
       renderMenu4();
     }));
+
+    loadListEl.querySelectorAll('.m4-load-chk').forEach((chk) => chk.addEventListener('change', (e) => {
+      e.stopPropagation();
+      const k = chk.dataset.loadKey;
+      if (chk.checked) selLoadKeys.add(k); else selLoadKeys.delete(k);
+      renderMenu4();
+    }));
+
+    loadListEl.querySelectorAll('.m4-load-select-all-t').forEach((chk) => chk.addEventListener('change', (e) => {
+      e.stopPropagation();
+      const tid = chk.dataset.selallTid;
+      const info = loadMap[tid] || { assignments: [] };
+      info.assignments.forEach((a) => {
+        const k = `${tid}::${a.classId}::${a.courseId}::${a.slot}`;
+        if (chk.checked) selLoadKeys.add(k); else selLoadKeys.delete(k);
+      });
+      renderMenu4();
+    }));
+
+    loadListEl.querySelectorAll('.m4-unassign-one').forEach((btn) => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cls = classes.find((x) => x.id === btn.dataset.clsId);
+      const c = cls && (cls.courses || []).find((x) => x.id === btn.dataset.crsId);
+      if (!c) return;
+      const slot = Number(btn.dataset.slot) || 1;
+      const oldTid = btn.dataset.srcTid;
+      if (slot === 2) c.teacherId2 = null; else c.teacherId = null;
+      const dropped = unplaceAssignmentFromSolution(cls, c, oldTid, null);
+      selLoadKeys.delete(`${oldTid}::${cls.id}::${c.id}::${slot}`);
+      saveState(); renderMenu4();
+      showToast(`${cls.name} - ${c.name} öğretmenden alındı${dropped > 0 ? ` (${dropped} blok programda boşa düştü)` : ''}.`);
+    }));
+
+    loadListEl.querySelectorAll('.m4-unassign-all').forEach((btn) => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const tid = btn.dataset.unassignAllTid;
+      let count = 0; let droppedTotal = 0;
+      classes.forEach((cls) => (cls.courses || []).forEach((c) => {
+        if (c.teacherId === tid) { c.teacherId = null; count++; droppedTotal += unplaceAssignmentFromSolution(cls, c, tid, null); }
+        if (c.teacherId2 === tid) { c.teacherId2 = null; count++; droppedTotal += unplaceAssignmentFromSolution(cls, c, tid, null); }
+      }));
+      saveState(); renderMenu4();
+      showToast(`${count} ders öğretmenden alındı${droppedTotal > 0 ? ` (${droppedTotal} blok boşa düştü)` : ''}.`);
+    }));
+
+    const btnClrSel = document.getElementById('btnM4BulkClearSel');
+    if (btnClrSel) btnClrSel.addEventListener('click', () => { selLoadKeys.clear(); renderMenu4(); });
+
+    const btnBulkTr = document.getElementById('btnM4BulkTransferSelected');
+    if (btnBulkTr) btnBulkTr.addEventListener('click', () => {
+      const targetTid = (document.getElementById('m4BulkTargetTeacher') || {}).value;
+      if (!targetTid) { showToast('Lütfen aktarılacak hedef öğretmeni seçin.'); return; }
+      let moved = 0; let droppedTotal = 0;
+      Array.from(selLoadKeys).forEach((k) => {
+        const [srcTid, clsId, crsId, slotStr] = k.split('::');
+        const cls = classes.find((x) => x.id === clsId);
+        const c = cls && (cls.courses || []).find((x) => x.id === crsId);
+        if (!c) return;
+        const slot = Number(slotStr) || 1;
+        if (slot === 2) c.teacherId2 = targetTid; else c.teacherId = targetTid;
+        droppedTotal += unplaceAssignmentFromSolution(cls, c, srcTid, targetTid);
+        moved++;
+      });
+      selLoadKeys.clear();
+      saveState(); renderMenu4();
+      showToast(`${moved} seçili ders yeni öğretmene aktarıldı${droppedTotal > 0 ? ` (${droppedTotal} blok programda boşa düştü)` : ''}.`);
+    });
+
+    const btnBulkRm = document.getElementById('btnM4BulkRemoveSelected');
+    if (btnBulkRm) btnBulkRm.addEventListener('click', () => {
+      let removed = 0; let droppedTotal = 0;
+      Array.from(selLoadKeys).forEach((k) => {
+        const [srcTid, clsId, crsId, slotStr] = k.split('::');
+        const cls = classes.find((x) => x.id === clsId);
+        const c = cls && (cls.courses || []).find((x) => x.id === crsId);
+        if (!c) return;
+        const slot = Number(slotStr) || 1;
+        if (slot === 2) c.teacherId2 = null; else c.teacherId = null;
+        droppedTotal += unplaceAssignmentFromSolution(cls, c, srcTid, null);
+        removed++;
+      });
+      selLoadKeys.clear();
+      saveState(); renderMenu4();
+      showToast(`${removed} seçili ders öğretmenlerden alındı${droppedTotal > 0 ? ` (${droppedTotal} blok boşa düştü)` : ''}.`);
+    });
 
     loadListEl.querySelectorAll('.m4-transfer-one').forEach((btn) => btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -5560,7 +5739,7 @@ function bindEvents() {
       if (!cls.courses) cls.courses = [];
       let addedHere = 0;
       templates.forEach((t) => {
-        if (!cls.courses.some((c) => c.code === t.code && c.category === t.category)) {
+        if (!findDuplicateCourseInClass(cls, t.code, t.name)) {
           cls.courses.push({ ...t, id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) });
           addedHere++;
         }
@@ -5636,6 +5815,11 @@ function bindEvents() {
     }
 
     if (!activeCls.courses) activeCls.courses = [];
+    const dupCourse = findDuplicateCourseInClass(activeCls, code, name, editId || null);
+    if (dupCourse) {
+      showToast(`${activeCls.name} şubesinde "${dupCourse.name}" dersi zaten tanımlı! Bir sınıfa aynı ders birden fazla kez verilemez.`);
+      return;
+    }
     if (editId) {
       const item = activeCls.courses.find((x) => x.id === editId);
       if (item) Object.assign(item, { name, code, category, group, hours, blocks: finalBlocks, blockMode: isAuto ? 'auto' : 'manual', maxPerDay, roomType, splitGroups, useCommonSlot });

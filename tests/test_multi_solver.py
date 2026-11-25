@@ -246,3 +246,20 @@ def test_maximize_placement_mode_with_root_cause_and_nav_links():
     assert res["unplaced"][0].get("nav") is not None
     assert "Çözüm önerisi" in res["unplaced"][0]["reason"]
 
+
+def test_duplicate_course_in_class_is_blocked():
+    """Bir sınıfa aynı dersin birden fazla kez verilmesi ön doğrulamada engellenmelidir."""
+    from validate_model import validate_model
+
+    cfg = make_sample_school_config()
+    first = dict(cfg["assignments"][0])
+    dup = dict(first)
+    dup["assignment_id"] = first["assignment_id"] + "_dup"
+    cfg["assignments"].append(dup)
+
+    val = validate_model(cfg)
+    assert val["valid"] is False
+    codes = [e["code"] for e in val["errors"]]
+    assert "DUPLICATE_COURSE_IN_CLASS" in codes
+
+

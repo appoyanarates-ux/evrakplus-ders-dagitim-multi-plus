@@ -1,5 +1,11 @@
 # Sürüm Geçmişi (CHANGELOG)
 
+## [1.0.6] — 2026-11-25
+### Profesyonel Öğretmen Ders Yükleri & Mükerrer Ders Koruması
+- **Menü 4 — Gelişmiş Öğretmen Ders Yükleri Paneli:** Her öğretmenin isminin altında atanan tüm dersler, şubeler, saatler ve **ders blokları (`Blok: 2+2+1`)** varsayılan olarak açık listelenir.
+- **Tekli ve Toplu Ders Alma / Değiştirme / Aktarma:** Her ders satırında `Değiştir` ve `Al` düğmeleri, öğretmen kartında `Tümünü Seç`, `Tümünü Aktar` ve `Tümünü Al` düğmeleri, ayrıca çoklu seçim (`checkbox`) yapıldığında açılan yapışkan toplu işlem çubuğuyla seçili dersleri tek tıkla başka bir öğretmene aktarma veya öğretmenlerden alma eklendi. Değiştirilen/alınan derslerin mevcut programdaki yerleşimleri otomatik olarak boşa düşürülür.
+- **Bir Sınıfa Bir Ders Kuralı (Mükerrer Ders Engeli):** Aynı şubeye aynı dersin (aynı ders kodu veya adı) birden fazla kez eklenmesi hem Menü 2'deki tüm ekleme/düzenleme ekranlarında hem de dağıtım öncesi doğrulamada (`DUPLICATE_COURSE_IN_CLASS`) engellendi.
+
 ## [1.0.5] — 2026-11-25
 ### Marka Düzeltmesi
 - Program adı **DersOptima Pro Haftalık Ders Dağıtım Programı** olarak güncellendi (masaüstü kurulum/taşınabilir EXE, kısayol, pencere başlığı, kenar çubuğu, Mobil PWA ve cPanel Web paketi).

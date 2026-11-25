@@ -368,6 +368,8 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
     room_hours: Dict[str, int] = defaultdict(int)
     room_type_hours: Dict[str, int] = defaultdict(int)
     assignments_by_id: Dict[str, Dict[str, Any]] = {}
+    seen_class_course_names: Dict[Tuple[str, str], str] = {}
+    seen_class_course_codes: Dict[Tuple[str, str], str] = {}
     total_blocks = 0
 
     for asgn in assignments:
@@ -375,6 +377,10 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
         cid = asgn.get("class_id")
         cname = asgn.get("class_name") or cid or "Bilinmeyen Şube"
         course_name = asgn.get("course_name") or asgn.get("course_code") or "Bilinmeyen Ders"
+        course_code = str(asgn.get("course_code") or "").strip().upper()
+        norm_cname = " ".join(
+            str(course_name).replace("İ", "i").replace("I", "ı").strip().lower().split()
+        )
         hours = int(asgn.get("hours") or 0)
         blocks = [int(b) for b in (asgn.get("blocks") or []) if int(b) > 0]
         t_ids = [tid for tid in (asgn.get("teacher_ids") or []) if tid]
@@ -402,6 +408,28 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
                 "linkLabel": "Şubelere Git →",
             })
             continue
+
+        dup_found = False
+        if course_code:
+            code_key = (cid, course_code)
+            if code_key in seen_class_course_codes:
+                dup_found = True
+            else:
+                seen_class_course_codes[code_key] = course_name
+        if norm_cname:
+            name_key = (cid, norm_cname)
+            if name_key in seen_class_course_names:
+                dup_found = True
+            else:
+                seen_class_course_names[name_key] = course_name
+        if dup_found:
+            errors.append({
+                "code": "DUPLICATE_COURSE_IN_CLASS",
+                "category": "Mükerrer Ders",
+                "message": f"{cname} şubesinde '{course_name}' dersi birden fazla kez tanımlanmış. Bir sınıfa aynı ders yalnızca bir kez verilebilir.",
+                "nav": {"view": "menu2", "classId": cid},
+                "linkLabel": f"{cname} Derslerini Düzelt →",
+            })
 
         if not blocks or sum(blocks) != hours:
             errors.append({
