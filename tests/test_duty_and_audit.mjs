@@ -112,3 +112,44 @@ test('3. Programı Kontrol Et: Tam adres göstererek tüm hata türlerini tespit
   assert.ok(report.errors.some((e) => e.address.includes('Menü 6 → Okul Nöbeti → Pazartesi / Bahçe → Müdür Bey')));
   assert.ok(report.errors.some((e) => e.address.includes('Menü 5 → Otomatik Dağıtım → 7/A → Fen Bilimleri')));
 });
+
+test('4. Okul Nöbeti: Haftada en fazla 1 gün kuralı ve aylık takvimde gün kapatma/açma', () => {
+  const teachers = [
+    { id: 't1', name: 'Ayşe Yılmaz', branch: 'Türkçe', role: 'ogretmen' },
+    { id: 't2', name: 'Mehmet Demir', branch: 'Matematik', role: 'ogretmen' }
+  ];
+  const state = {
+    school: { name: 'Test Ortaokulu' },
+    grid: { periodsPerDay: 7 },
+    solution: {
+      placements: [
+        { day_index: 0, start_period: 0, length: 4, teacher_ids: ['t1'] },
+        { day_index: 2, start_period: 0, length: 5, teacher_ids: ['t2'] }
+      ]
+    }
+  };
+  DutyModule.autoAssignSchoolDuties(state, teachers, [0, 1, 2, 3, 4], 'busiest_day');
+  // Kuralı zorla test et: t1 hem Pazartesi hem Salı'ya elle eklense bile aynı hafta içinde en fazla 1 kez görünmeli
+  state.dutyConfig.weeklyAssignments[1]['Bahçe'].push('t1');
+
+  // 2026 Kasım 10 Salı gününü kapat
+  const closed = DutyModule.toggleClosedDate(state, '2026-11-10');
+  assert.equal(closed, true);
+
+  const monthly = DutyModule.buildMonthlyDutySchedule(state, teachers, [0, 1, 2, 3, 4], 2026, 11, true);
+  assert.equal(monthly.closedCount, 1);
+  assert.equal(monthly.rows.some((r) => r.isoDate === '2026-11-10'), false);
+
+  // Her haftada bir öğretmen en fazla 1 kez nöbet tutabilir
+  const weekCounts = {};
+  for (const r of monthly.rows) {
+    const wk = r.weekIndex;
+    if (!weekCounts[wk]) weekCounts[wk] = {};
+    for (const names of Object.values(r.byLocation)) {
+      for (const nm of names) {
+        weekCounts[wk][nm] = (weekCounts[wk][nm] || 0) + 1;
+        assert.ok(weekCounts[wk][nm] <= 1, `Hafta ${wk} içinde ${nm} birden fazla nöbet tuttu!`);
+      }
+    }
+  }
+});

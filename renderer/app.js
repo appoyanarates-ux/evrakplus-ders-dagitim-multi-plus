@@ -3960,8 +3960,9 @@ function renderMenu5Templates() {
   const unplacedInfo = getUnplacedCourseSummaryMap();
   const totalUnplacedBlocks = unplacedInfo.allUnplaced.reduce((s, u) => s + u.missingBlocks, 0);
   const unplacedTooltip = unplacedInfo.allUnplaced.slice(0, 12).map((u) => `${u.className} ${u.courseName} (${u.missingBlocks} blok / ${u.missingHours} sa)`).join('\n');
+  const bulkLockOn = Boolean(window._m5BulkLockMode);
   lockBarEl.innerHTML = `
-    <div class="flex flex-wrap items-center gap-3">
+    <div class="flex flex-wrap items-center gap-2.5">
       <span class="inline-flex items-center gap-1.5 font-bold ${pinnedCnt > 0 ? 'text-amber-800' : 'text-slate-500'}">
         <span class="w-3.5 h-3.5 rounded border-2 border-amber-600 bg-amber-200 inline-block"></span>
         Kilitli Ders: <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">${pinnedCnt}</span>
@@ -3974,8 +3975,45 @@ function renderMenu5Templates() {
         Boşta / Yerleşmemiş Ders: <span class="px-1.5 py-0.5 rounded bg-rose-600 text-white">${totalUnplacedBlocks} blok</span>
       </span>` : ''}
     </div>
-    ${(pinnedCnt > 0 || lockedTCnt > 0) ? `<button type="button" id="btnM5UnlockAll" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold transition">Tüm Kilitleri Kaldır</button>` : `<span class="text-[11px] text-slate-400">Kilitlenen ders ve öğretmenler yeniden dağıtımda sabit kalır</span>`}
+    <div class="flex flex-wrap items-center gap-1.5">
+      <button type="button" id="btnM5BulkLockMode" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${bulkLockOn ? 'bg-amber-600 text-white border-amber-600 shadow-xs' : 'bg-white hover:bg-amber-50 text-amber-800 border-amber-300'}">
+        🔒 ${bulkLockOn ? 'Toplu Kilit Modu: AÇIK (Bitir)' : 'Toplu Kilit Seçimi'}
+      </button>
+      ${placements.length > 0 ? `<button type="button" id="btnM5LockAllVisible" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-[11px] font-bold transition">Görünümü Kilitle</button>` : ''}
+      ${(pinnedCnt > 0 || lockedTCnt > 0) ? `<button type="button" id="btnM5UnlockAll" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold transition">Tüm Kilitleri Kaldır</button>` : ''}
+    </div>
   `;
+  const btnBulkMode = document.getElementById('btnM5BulkLockMode');
+  if (btnBulkMode) {
+    btnBulkMode.addEventListener('click', () => {
+      window._m5BulkLockMode = !window._m5BulkLockMode;
+      renderMenu5Templates();
+      showToast(window._m5BulkLockMode
+        ? 'Toplu Kilit Seçim Modu açıldı: Ders hücrelerine tek tıkla seri kilitleme/açma yapabilirsiniz.'
+        : 'Toplu Kilit Seçim Modu kapatıldı.');
+    });
+  }
+  const btnLockVisible = document.getElementById('btnM5LockAllVisible');
+  if (btnLockVisible) {
+    btnLockVisible.addEventListener('click', () => {
+      if (!Array.isArray(state.pinnedPlacementIds)) state.pinnedPlacementIds = [];
+      const pinnedSet = new Set(state.pinnedPlacementIds);
+      let targetPlacements = placements;
+      if (state.m5TplTab === 'class' && state.m5EntityId) {
+        targetPlacements = placements.filter((p) => p.class_id === state.m5EntityId);
+      } else if (state.m5TplTab === 'teacher' && state.m5EntityId) {
+        targetPlacements = placements.filter((p) => (p.teacher_ids || []).includes(state.m5EntityId));
+      }
+      let added = 0;
+      targetPlacements.forEach((pl) => {
+        const k = getPlacementKey(pl);
+        if (!pinnedSet.has(k)) { pinnedSet.add(k); added++; }
+      });
+      state.pinnedPlacementIds = Array.from(pinnedSet);
+      saveState(); renderMenu5Templates();
+      showToast(added > 0 ? `${added} ders bloğu topluca kilitlendi.` : 'Görünümdeki tüm dersler zaten kilitli.');
+    });
+  }
   const btnUnlockAll = document.getElementById('btnM5UnlockAll');
   if (btnUnlockAll) {
     btnUnlockAll.addEventListener('click', () => {
@@ -4168,10 +4206,44 @@ function renderMenu5Templates() {
     `;
   }
 
-  stageEl.querySelectorAll('.m5-pl-btn').forEach((btn) => btn.addEventListener('click', () => {
-    const pl = placements.find((x) => getPlacementKey(x) === btn.dataset.m5PlKey);
-    if (pl) openCellActionModal(pl);
-  }));
+  const togglePlacementLockByKey = (key) => {
+    if (!Array.isArray(state.pinnedPlacementIds)) state.pinnedPlacementIds = [];
+    const idx = state.pinnedPlacementIds.indexOf(key);
+    let lockedNow = false;
+    if (idx >= 0) {
+      state.pinnedPlacementIds.splice(idx, 1);
+      lockedNow = false;
+    } else {
+      state.pinnedPlacementIds.push(key);
+      lockedNow = true;
+    }
+    saveState();
+    renderMenu5Templates();
+    showToast(lockedNow ? 'Ders bloğu kilitlendi 🔒' : 'Ders bloğu kilidi kaldırıldı 🔓');
+  };
+
+  stageEl.querySelectorAll('.m5-pl-btn').forEach((btn) => {
+    let clickTimer = null;
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.m5PlKey;
+      if (window._m5BulkLockMode) {
+        togglePlacementLockByKey(key);
+        return;
+      }
+      if (clickTimer) clearTimeout(clickTimer);
+      clickTimer = setTimeout(() => {
+        clickTimer = null;
+        const pl = placements.find((x) => getPlacementKey(x) === key);
+        if (pl) openCellActionModal(pl);
+      }, 220);
+    });
+    btn.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+      togglePlacementLockByKey(btn.dataset.m5PlKey);
+    });
+  });
   stageEl.querySelectorAll('.m5-av-toggle').forEach((btn) => btn.addEventListener('click', () => {
     toggleTeacherAvailabilityAt(btn.dataset.m5AvTid, Number(btn.dataset.m5AvD), Number(btn.dataset.m5AvP));
   }));
@@ -4657,11 +4729,11 @@ function renderSchoolDutyTab(contentEl) {
         </div>
       </div>
 
-      <!-- Aylık Nöbet Hazırlama -->
+      <!-- Aylık Nöbet Takvimi & Çizelgesi -->
       <div class="pt-3 border-t border-slate-200 space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div class="flex flex-wrap items-center gap-2">
-            <span class="text-sm font-bold text-slate-900">Aylık Nöbet Çizelgesi</span>
+            <span class="text-sm font-bold text-slate-900">Aylık Nöbet Takvimi ve Çizelgesi</span>
             <select id="selDutyMonth" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold bg-white">
               ${DM.MONTH_NAMES.map((mn, i) => `<option value="${i + 1}" ${cfg.month === i + 1 ? 'selected' : ''}>${mn}</option>`).join('')}
             </select>
@@ -4671,9 +4743,53 @@ function renderSchoolDutyTab(contentEl) {
               <span>Haftalık Nöbet Yeri Rotasyonu</span>
             </label>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            ${monthly.closedCount > 0 ? `<button id="btnDutyOpenAllMonth" type="button" class="px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold transition">Kapalı Günleri Aç (${monthly.closedCount})</button>` : ''}
             <button id="btnDutyExportPdf" type="button" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition">Aylık Nöbet PDF / Yazdır</button>
             <button id="btnDutyExportXlsx" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition">Aylık Nöbet Excel (.xlsx)</button>
+          </div>
+        </div>
+
+        <!-- Etkileşimli Aylık Takvim (Gün Kapatma / Açma) -->
+        <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 space-y-2.5">
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="font-bold text-slate-800">
+              ${escapeHtml(monthly.monthName)} ${monthly.year} Aylık Takvim <span class="font-normal text-slate-500">(Tatil / kapalı gün eklemek veya açmak için güne tıklayın)</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-[10px] font-semibold">
+              <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">Açık (Nöbet Var)</span>
+              <span class="px-2 py-0.5 rounded bg-rose-100 text-rose-800">Kapalı / Tatil</span>
+              <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">Kural: 1 öğretmen / hafta en fazla 1 gün</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold text-slate-500">
+            <div>Pzt</div><div>Sal</div><div>Çar</div><div>Per</div><div>Cum</div><div>Cmt</div><div>Paz</div>
+          </div>
+          <div class="grid grid-cols-7 gap-1.5">
+            ${(() => {
+              const firstJs = new Date(monthly.year, monthly.month - 1, 1).getDay(); // 0=Paz..6=Cmt
+              const pad = firstJs === 0 ? 6 : firstJs - 1;
+              const blanks = Array.from({ length: pad }, () => `<div class="h-12 rounded-lg bg-transparent"></div>`).join('');
+              const cells = (monthly.calendarDays || []).map((cd) => {
+                if (!cd.isSchoolDay) {
+                  return `<div class="h-12 rounded-lg border border-slate-200/70 bg-slate-100/80 p-1.5 flex flex-col justify-between text-slate-400">
+                    <span class="text-[11px] font-bold">${cd.dayNum}</span>
+                    <span class="text-[9px]">${cd.isWeekend ? 'Hafta Sonu' : 'Kapalı'}</span>
+                  </div>`;
+                }
+                if (cd.isClosed) {
+                  return `<button type="button" data-duty-iso="${cd.isoDate}" class="btn-duty-cal-day h-12 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 p-1.5 flex flex-col justify-between text-left transition">
+                    <div class="flex items-center justify-between w-full"><span class="text-[11px] font-extrabold text-rose-700 line-through">${cd.dayNum}</span><span class="text-[9px] font-bold text-rose-600">✕</span></div>
+                    <span class="text-[9px] font-bold text-rose-700 truncate">Kapalı / Tatil</span>
+                  </button>`;
+                }
+                return `<button type="button" data-duty-iso="${cd.isoDate}" class="btn-duty-cal-day h-12 rounded-lg border border-emerald-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/60 p-1.5 flex flex-col justify-between text-left transition">
+                  <div class="flex items-center justify-between w-full"><span class="text-[11px] font-extrabold text-slate-800">${cd.dayNum}</span><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span></div>
+                  <span class="text-[9px] font-semibold text-emerald-700 truncate">${cd.dutyCount > 0 ? `${cd.dutyCount} nöbetçi` : 'Açık'}</span>
+                </button>`;
+              }).join('');
+              return blanks + cells;
+            })()}
           </div>
         </div>
 
@@ -4732,6 +4848,19 @@ function renderSchoolDutyTab(contentEl) {
   document.getElementById('selDutyMonth').addEventListener('change', (e) => { cfg.month = Number(e.target.value); saveState(); renderMenu6(); });
   document.getElementById('inpDutyYear').addEventListener('change', (e) => { cfg.year = Number(e.target.value) || new Date().getFullYear(); saveState(); renderMenu6(); });
   document.getElementById('chkDutyRotate').addEventListener('change', (e) => { cfg.rotateWeekly = Boolean(e.target.checked); saveState(); renderMenu6(); });
+  contentEl.querySelectorAll('.btn-duty-cal-day').forEach((btn) => btn.addEventListener('click', () => {
+    const iso = btn.dataset.dutyIso;
+    if (!iso) return;
+    const nowClosed = DM.toggleClosedDate(state, iso);
+    saveState(); renderMenu6();
+    showToast(nowClosed ? `${iso} tatil/kapalı olarak işaretlendi (nöbet yazılmayacak).` : `${iso} tekrar nöbete açıldı.`);
+  }));
+  document.getElementById('btnDutyOpenAllMonth')?.addEventListener('click', () => {
+    const prefix = `${cfg.year}-${String(cfg.month).padStart(2, '0')}-`;
+    Object.keys(cfg.closedDates || {}).forEach((k) => { if (k.startsWith(prefix)) delete cfg.closedDates[k]; });
+    saveState(); renderMenu6();
+    showToast(`${monthly.monthName} ${monthly.year} ayındaki tüm kapalı günler açıldı.`);
+  });
 
   document.getElementById('btnDutyExportPdf').addEventListener('click', async () => {
     const html = DM.buildMonthlyDutyPrintHtml(state, monthly);

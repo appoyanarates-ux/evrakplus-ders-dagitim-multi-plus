@@ -10,18 +10,19 @@
   <meta name="apple-mobile-web-app-title" content="DersOptima Pro" />
   <title>DersOptima Pro Haftalık Ders Dağıtım Programı — MEB 2026-2027</title>
   <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./assets/favicon.ico" />
   <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="./assets/styles.css?v=1.0.8" />
-  <script src="./assets/lucide.min.js?v=1.0.8"></script>
-  <script src="./assets/xlsx.full.min.js?v=1.0.8"></script>
+  <link rel="stylesheet" href="./assets/styles.css?v=1.0.9" />
+  <script src="./assets/lucide.min.js?v=1.0.9"></script>
+  <script src="./assets/xlsx.full.min.js?v=1.0.9"></script>
 </head>
 <body class="min-h-screen flex flex-col lg:flex-row antialiased overflow-x-hidden">
 
   <!-- Mobil Üst Bar -->
   <header class="lg:hidden sticky top-0 z-30 bg-slate-900 text-white px-4 py-3 flex items-center justify-between shadow-md">
     <div class="flex items-center gap-2.5">
-      <div class="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center font-bold text-sm">DO</div>
+      <img src="./assets/brand-logo.png" alt="DersOptima Pro" class="w-8 h-8 rounded-lg object-cover shadow-sm" />
       <div>
         <div class="text-sm font-semibold leading-tight">DersOptima Pro</div>
         <div class="text-[11px] text-slate-400">Haftalık Ders Dağıtım Programı</div>
@@ -43,9 +44,7 @@
   <aside id="sidebar" class="fixed lg:sticky top-0 left-0 z-50 h-screen w-72 shrink-0 bg-slate-900 text-slate-100 flex flex-col transform -translate-x-full lg:translate-x-0 transition-transform duration-200 ease-in-out shadow-xl lg:shadow-none">
     <div class="p-5 border-b border-slate-800 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-inner">
-          <i data-lucide="calendar-cog" class="w-5 h-5 text-white"></i>
-        </div>
+        <img src="./assets/brand-logo.png" alt="DersOptima Pro" class="w-10 h-10 rounded-xl object-cover shadow-md" />
         <div>
           <h1 class="text-sm font-bold tracking-tight text-white">DersOptima Pro</h1>
           <p class="text-[11px] text-slate-400 leading-tight">Haftalık Ders Dağıtım Programı</p>
@@ -110,7 +109,7 @@
       <p class="text-[11px] text-slate-500 text-center">Veriler yerel olarak otomatik saklanır</p>
       <button id="btnSidebarSettingsAbout" type="button" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-950/60 hover:bg-slate-800 border border-slate-800 text-[11px] font-medium text-slate-300 hover:text-white transition">
         <span class="inline-flex items-center gap-1.5"><i data-lucide="settings" class="w-3.5 h-3.5 text-slate-400"></i> Ayarlar ve Hakkında</span>
-        <span id="sidebarVersionTag" class="text-[10px] text-slate-400 font-mono">v1.0.8</span>
+        <span id="sidebarVersionTag" class="text-[10px] text-slate-400 font-mono">v1.0.9</span>
       </button>
     </div>
   </aside>
@@ -122,6 +121,9 @@
          MENÜ 1: KURUM VE ZAMAN ÇİZELGESİ
          ===================================================================== -->
     <section id="view-menu1" class="hidden space-y-6">
+      <div class="rounded-2xl overflow-hidden border border-emerald-200/80 shadow-sm bg-white">
+        <img src="./assets/brand-banner.jpg" alt="DersOptima PRO — Akıllı Ders Planlama ve Optimizasyon Sistemi by EvrakPlus" class="w-full h-24 sm:h-32 md:h-36 object-cover object-center" />
+      </div>
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold mb-2">
@@ -2209,16 +2211,16 @@
     <span id="toastText">Kaydedildi</span>
   </div>
 
-  <script src="./editor_logic.js?v=1.0.8"></script>
-  <script src="./export_engine.js?v=1.0.8"></script>
-  <script src="./duty_module.js?v=1.0.8"></script>
-  <script src="./web_evrakplus_bridge.js?v=1.0.8"></script>
-  <script src="./evrakplus_ui.js?v=1.0.8"></script>
-  <script src="./system_ui.js?v=1.0.8"></script>
-  <script src="./pwa_install.js?v=1.0.8"></script>
-  <script src="./clubs_module.js?v=1.0.8"></script>
-  <script src="./multi_solver_ui.js?v=1.0.8"></script>
-  <script src="./meb_curriculum.js?v=1.0.8"></script>
-  <script src="./app.js?v=1.0.8"></script>
+  <script src="./editor_logic.js?v=1.0.9"></script>
+  <script src="./export_engine.js?v=1.0.9"></script>
+  <script src="./duty_module.js?v=1.0.9"></script>
+  <script src="./web_evrakplus_bridge.js?v=1.0.9"></script>
+  <script src="./evrakplus_ui.js?v=1.0.9"></script>
+  <script src="./system_ui.js?v=1.0.9"></script>
+  <script src="./pwa_install.js?v=1.0.9"></script>
+  <script src="./clubs_module.js?v=1.0.9"></script>
+  <script src="./multi_solver_ui.js?v=1.0.9"></script>
+  <script src="./meb_curriculum.js?v=1.0.9"></script>
+  <script src="./app.js?v=1.0.9"></script>
 </body>
 </html>

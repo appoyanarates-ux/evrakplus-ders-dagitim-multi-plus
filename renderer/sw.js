@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'dersoptima-pro-pwa-v1.0.8';
+const CACHE_NAME = 'dersoptima-pro-pwa-v1.0.9';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -19,6 +19,9 @@ const STATIC_ASSETS = [
   './assets/styles.css',
   './assets/lucide.min.js',
   './assets/xlsx.full.min.js',
+  './assets/brand-logo.png',
+  './assets/brand-banner.jpg',
+  './assets/favicon.ico',
   './assets/icon-192.png',
   './assets/icon-512.png',
   './assets/icon-maskable-512.png',

@@ -36,9 +36,6 @@ win:
     - target: nsis
       arch:
         - x64
-    - target: portable
-      arch:
-        - x64
 nsis:
   oneClick: false
   perMachine: false
@@ -52,8 +49,6 @@ nsis:
   installerHeaderIcon: build/icon.ico
   artifactName: DersOptima-Pro-Haftalik-Ders-Dagitim-Programi-${version}-Setup.${ext}
   include: build/installer.nsh
-portable:
-  artifactName: DersOptima-Pro-Haftalik-Ders-Dagitim-Programi-${version}-Portable.${ext}
 publish:
   - provider: github
     owner: appoyanarates-ux

@@ -50,6 +50,7 @@
       rotateWeekly: true,
       month: now.getMonth() + 1,
       year: now.getFullYear(),
+      closedDates: {}, // { 'YYYY-MM-DD': true }
       weeklyAssignments: {} // { [dayIndex]: { [location]: [teacherId, ...] } }
     };
   }
@@ -64,9 +65,27 @@
     if (!state.dutyConfig.weeklyAssignments || typeof state.dutyConfig.weeklyAssignments !== 'object') {
       state.dutyConfig.weeklyAssignments = {};
     }
+    if (!state.dutyConfig.closedDates || typeof state.dutyConfig.closedDates !== 'object') {
+      state.dutyConfig.closedDates = {};
+    }
     if (!state.dutyConfig.month) state.dutyConfig.month = new Date().getMonth() + 1;
     if (!state.dutyConfig.year) state.dutyConfig.year = new Date().getFullYear();
     return state.dutyConfig;
+  }
+
+  function isDateClosed(state, isoDate) {
+    const cfg = ensureDutyConfig(state);
+    return Boolean(cfg.closedDates && cfg.closedDates[isoDate]);
+  }
+
+  function toggleClosedDate(state, isoDate) {
+    const cfg = ensureDutyConfig(state);
+    if (cfg.closedDates[isoDate]) {
+      delete cfg.closedDates[isoDate];
+      return false;
+    }
+    cfg.closedDates[isoDate] = true;
+    return true;
   }
 
   /**
@@ -173,11 +192,22 @@
       return bSpread - aSpread;
     });
 
+    // KURAL: Bir öğretmen bir haftada EN FAZLA 1 gün nöbet tutabilir (kesinlikle birden fazla tutamaz)
+    const assignedTeachers = new Set();
+
     ordered.forEach((t) => {
+      if (assignedTeachers.has(t.id)) return;
       const dMap = hoursMap[t.id] || {};
+      const hasAnyLessonDay = activeDayIndices.some((d) => (dMap[d] || 0) > 0);
       const candidates = [...activeDayIndices].sort((d1, d2) => {
         const h1 = dMap[d1] || 0;
         const h2 = dMap[d2] || 0;
+        // Ders programı varsa öğretmenin okulda bulunduğu (>0 saat) günleri önceliklendir
+        if (hasAnyLessonDay) {
+          const present1 = h1 > 0 ? 0 : 1;
+          const present2 = h2 > 0 ? 0 : 1;
+          if (present1 !== present2) return present1 - present2;
+        }
         const over1 = dayCounts[d1] >= maxPerDay ? 1 : 0;
         const over2 = dayCounts[d2] >= maxPerDay ? 1 : 0;
         if (over1 !== over2) return over1 - over2;
@@ -185,10 +215,6 @@
         if (strategy === 'busiest_day') {
           if (h2 !== h1) return h2 - h1;
         } else {
-          // En az ders günü: mümkünse öğretmenin okulda bulunduğu (>0 saat) en az yoğun günü seç
-          const pos1 = h1 > 0 ? 0 : 1;
-          const pos2 = h2 > 0 ? 0 : 1;
-          if (pos1 !== pos2) return pos1 - pos2;
           if (h1 !== h2) return h1 - h2;
         }
         return dayCounts[d1] - dayCounts[d2];
@@ -199,6 +225,7 @@
       const chosenLoc = [...locations].sort((l1, l2) => cellCounts[`${chosenDay}__${l1}`] - cellCounts[`${chosenDay}__${l2}`])[0];
 
       weekly[chosenDay][chosenLoc].push(t.id);
+      assignedTeachers.add(t.id);
       dayCounts[chosenDay]++;
       cellCounts[`${chosenDay}__${chosenLoc}`]++;
 
@@ -208,7 +235,7 @@
 
     cfg.weeklyAssignments = weekly;
     return {
-      assignedCount: eligible.length,
+      assignedCount: assignedTeachers.size,
       skippedAdminsCount: skippedAdmins.length,
       strategy,
       weeklyAssignments: weekly
@@ -216,45 +243,93 @@
   }
 
   /**
-   * Seçilen ay ve yıl için Aylık Okul Nöbeti Çizelgesi üretir (isteğe bağlı haftalık rotasyonlu).
+   * Seçilen ay ve yıl için Aylık Okul Nöbeti Çizelgesi ve Etkileşimli Aylık Takvim üretir.
+   * KURAL 1: Aylık takvimde kapatılan (tatil/kapalı) günlere nöbet yazılmaz.
+   * KURAL 2: Bir öğretmen aynı hafta içinde EN FAZLA 1 gün nöbet tutabilir.
    */
   function buildMonthlyDutySchedule(state, teachers, activeDayIndices, year, month1To12, rotateWeekly = true) {
     const cfg = ensureDutyConfig(state);
     const locations = cfg.locations;
     const weekly = cfg.weeklyAssignments || {};
+    const closedDates = cfg.closedDates || {};
     const tMap = Object.fromEntries(teachers.map((t) => [t.id, t]));
     const activeSet = new Set(activeDayIndices);
 
     const daysInMonth = new Date(year, month1To12, 0).getDate();
     const rows = [];
+    const calendarDays = [];
     let weekIndex = 0;
     let lastJsDay = -1;
+    let usedInCurrentWeek = new Set();
 
     for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
       const dt = new Date(year, month1To12 - 1, dayNum);
       const jsDay = dt.getDay(); // 0=Pazar, 1=Pzt..6=Cmt
-      if (jsDay === 0) continue;
+      const mm = String(month1To12).padStart(2, '0');
+      const dd = String(dayNum).padStart(2, '0');
+      const isoDate = `${year}-${mm}-${dd}`;
+      const dateStr = `${dd}.${mm}.${year}`;
+
+      if (jsDay === 0) {
+        calendarDays.push({
+          dayNum, isoDate, dateStr, jsDay, dayIndex: -1, dayName: 'Pazar',
+          isWeekend: true, isSchoolDay: false, isClosed: true, dutyCount: 0
+        });
+        continue;
+      }
       const appDayIdx = jsDay - 1; // 0=Pzt..5=Cmt
       if (lastJsDay !== -1 && jsDay < lastJsDay) {
         weekIndex++;
+        usedInCurrentWeek = new Set();
       }
       lastJsDay = jsDay;
-      if (!activeSet.has(appDayIdx)) continue;
+
+      const isActiveSchoolDay = activeSet.has(appDayIdx);
+      const isManuallyClosed = Boolean(closedDates[isoDate]);
+
+      if (!isActiveSchoolDay) {
+        calendarDays.push({
+          dayNum, isoDate, dateStr, jsDay, dayIndex: appDayIdx, dayName: DAY_NAMES[appDayIdx],
+          isWeekend: appDayIdx === 5, isSchoolDay: false, isClosed: true, dutyCount: 0
+        });
+        continue;
+      }
+
+      if (isManuallyClosed) {
+        calendarDays.push({
+          dayNum, isoDate, dateStr, jsDay, dayIndex: appDayIdx, dayName: DAY_NAMES[appDayIdx],
+          isWeekend: false, isSchoolDay: true, isClosed: true, dutyCount: 0
+        });
+        continue;
+      }
 
       const dayAssignments = weekly[appDayIdx] || {};
       const byLocation = {};
+      let dayDutyCount = 0;
       locations.forEach((loc, locIdx) => {
-        // Haftalık rotasyon: her hafta nöbet yeri bir sonraki yere kaydırılır
         const srcLocIdx = rotateWeekly ? ((locIdx - (weekIndex % locations.length) + locations.length) % locations.length) : locIdx;
         const srcLoc = locations[srcLocIdx];
-        const ids = (dayAssignments[srcLoc] || []).filter((id) => tMap[id] && !isDutyExempt(tMap[id]));
-        byLocation[loc] = ids.map((id) => tMap[id].name);
+        const rawIds = (dayAssignments[srcLoc] || []).filter((id) => tMap[id] && !isDutyExempt(tMap[id]));
+        // Kesin kural: Aynı hafta içinde 1 öğretmen en fazla 1 gün nöbet tutabilir
+        const allowedIds = [];
+        rawIds.forEach((id) => {
+          if (!usedInCurrentWeek.has(id)) {
+            usedInCurrentWeek.add(id);
+            allowedIds.push(id);
+          }
+        });
+        dayDutyCount += allowedIds.length;
+        byLocation[loc] = allowedIds.map((id) => tMap[id].name);
       });
 
-      const dd = String(dayNum).padStart(2, '0');
-      const mm = String(month1To12).padStart(2, '0');
+      calendarDays.push({
+        dayNum, isoDate, dateStr, jsDay, dayIndex: appDayIdx, dayName: DAY_NAMES[appDayIdx],
+        isWeekend: false, isSchoolDay: true, isClosed: false, dutyCount: dayDutyCount
+      });
+
       rows.push({
-        dateStr: `${dd}.${mm}.${year}`,
+        isoDate,
+        dateStr,
         dayIndex: appDayIdx,
         dayName: DAY_NAMES[appDayIdx],
         weekIndex,
@@ -262,12 +337,15 @@
       });
     }
 
+    const closedCount = calendarDays.filter((d) => d.isSchoolDay && d.isClosed).length;
     return {
       year,
       month: month1To12,
       monthName: MONTH_NAMES[month1To12 - 1] || String(month1To12),
       locations,
-      rows
+      rows,
+      calendarDays,
+      closedCount
     };
   }
 
@@ -483,6 +561,8 @@
     isDutyExempt,
     createDefaultDutyConfig,
     ensureDutyConfig,
+    isDateClosed,
+    toggleClosedDate,
     doesTeacherExtraMatchCourse,
     computeTeacherDailyHoursMap,
     autoAssignSchoolDuties,

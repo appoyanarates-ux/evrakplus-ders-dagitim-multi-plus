@@ -1,5 +1,12 @@
 # Sürüm Geçmişi (CHANGELOG)
 
+## [1.0.9] — 2026-11-25
+### Şablon Çift Tık & Toplu Kilit, Aylık Nöbet Takvimi ve Yeni DersOptima PRO Görsel Kimliği
+- **Haftalık Ders Programı Şablonlarında Çift Tık Kilit ve Toplu Kilit Seçimi:** Tüm 4 şablonda (Sınıf, Öğretmen, Sınıf Çarşafı, Öğretmen Çarşafı) ders hücresine **çift tıklayarak** anında kilitleme/kaldırma düzeltildi; üst çubuğa **Toplu Kilit Seçimi** modu (tek tıkla seri kilitleme/açma) ve **Görünümü Kilitle** düğmesi eklendi.
+- **Okul Nöbeti — Haftada En Fazla 1 Gün Kuralı & Etkileşimli Aylık Takvim:** Bir öğretmenin aynı hafta içinde kesinlikle en fazla 1 gün nöbet tutması kuralı hem haftalık hem aylık dağıtımda zorunlu kılındı; öğretmenlerin ders programına göre dağıtım güçlendirildi ve aylık takvimde gün kapatma/açma (tatil/kapalı gün) özelliği eklendi.
+- **Yeni DersOptima PRO Görsel Kimliği:** Yeni resmî Windows simgesi (`windows-simgesi.ico`), uygulama logosu ve üst marka afişi tüm arayüz, PWA ve Windows kurulum paketine uygulandı.
+- **Sadeleştirilmiş Kurulum Paketi:** Portable EXE üretimi kaldırıldı; yalnızca tek Windows Kurulum (`Setup.exe`) ve cPanel/Web/WordPress paketleri üretilir.
+
 ## [1.0.8] — 2026-11-25
 ### Menü 4 Geniş Öğretmen Ders Yükleri, Akıllı Seçmeli Öner & Ata ve Filtre Düzeltmesi
 - **Modern Tam Genişlik Sekmeli Menü 4:** Menü 4 üç geniş sekmeye ayrıldı (**Şube–Ders Atama Tablosu**, **Öğretmen Ders Yükleri — Geniş Yönetim Merkezi**, **Özel Derslikler**); Öğretmen Ders Yükleri dar yan panelden çıkıp 2 sütunlu tam genişlik kart ızgarasına taşındı.
