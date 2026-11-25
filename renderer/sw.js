@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'dersoptima-pro-pwa-v1.0.7';
+const CACHE_NAME = 'dersoptima-pro-pwa-v1.0.8';
 const STATIC_ASSETS = [
   './',
   './index.html',

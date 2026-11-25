@@ -1,5 +1,12 @@
 # Sürüm Geçmişi (CHANGELOG)
 
+## [1.0.8] — 2026-11-25
+### Menü 4 Geniş Öğretmen Ders Yükleri, Akıllı Seçmeli Öner & Ata ve Filtre Düzeltmesi
+- **Modern Tam Genişlik Sekmeli Menü 4:** Menü 4 üç geniş sekmeye ayrıldı (**Şube–Ders Atama Tablosu**, **Öğretmen Ders Yükleri — Geniş Yönetim Merkezi**, **Özel Derslikler**); Öğretmen Ders Yükleri dar yan panelden çıkıp 2 sütunlu tam genişlik kart ızgarasına taşındı.
+- **Öğretmen Ders Yükleri Üzerinde Tam Yönetim:** Her ders satırında **Düzelt** (saat/blok/ad düzenleme), **Değiştir** (öğretmen aktarma), **Al** (öğretmenden çıkarma) ve **Sil** (şubeden silme) düğmeleri; ayrıca her öğretmen kartında **`+ Ders Ekle / Ata`** penceresi (mevcut atanmamış dersi atama veya şubeye yeni ders ekleyip bu ya da başka bir öğretmene atama) eklendi.
+- **Akıllı Seçmeli Ders Öner ve Ata:** Haftalık ders saati eksik şubeler için MEB/TTKB kurallarına (3 seçmeli grup + bir sınıfa bir ders kuralı) uygun seçmeli dersleri ve boş kapasiteli öğretmenleri otomatik öneren, tek tek düzenlenip tek tıkla eklenebilen **Seçmeli Ders Öner ve Ata** aracı eklendi.
+- **Atanmamış Ders Filtre Hatası Düzeltildi:** Menü 4'te eski/gizli kalan şube/arama filtrelerinin 56 atanmamış dersten yalnızca 1'ini göstermesi sorunu giderildi; filtre girdileri durumla senkronize edildi, aktif filtre uyarı şeridi + **Tüm Dersleri Göster** düğmesi eklendi ve **Atanmamış Ders** KPI kartı tek tıkla tüm atanmamış dersleri açacak şekilde bağlandı.
+
 ## [1.0.7] — 2026-11-25
 ### Resmî MEB / TTKB 2025–2026 ve 2026–2027 Haftalık Ders Çizelgeleri & Okul Türü Gruplandırması
 - **5 Resmî Kurum Grubunda 19 Okul Türü (`renderer/meb_curriculum.js`):**

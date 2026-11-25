@@ -12,9 +12,9 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="./assets/styles.css?v=1.0.7" />
-  <script src="./assets/lucide.min.js?v=1.0.7"></script>
-  <script src="./assets/xlsx.full.min.js?v=1.0.7"></script>
+  <link rel="stylesheet" href="./assets/styles.css?v=1.0.8" />
+  <script src="./assets/lucide.min.js?v=1.0.8"></script>
+  <script src="./assets/xlsx.full.min.js?v=1.0.8"></script>
 </head>
 <body class="min-h-screen flex flex-col lg:flex-row antialiased overflow-x-hidden">
 
@@ -534,6 +534,9 @@
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+          <button id="btnM4SuggestElectives" type="button" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-xs sm:text-sm font-bold text-white shadow-sm transition">
+            <i data-lucide="lightbulb" class="w-4 h-4"></i> Seçmeli Ders Öner ve Ata
+          </button>
           <button id="btnM4AutoMatch" type="button" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-xs sm:text-sm font-semibold text-white shadow-sm transition">
             <i data-lucide="wand-2" class="w-4 h-4"></i> Branşa Göre Boşları Dağıt
           </button>
@@ -555,82 +558,126 @@
           <div id="m4KpiAssignedHours" class="text-2xl font-bold text-indigo-700 mt-1">0 / 0 sa</div>
           <div id="m4KpiAssignedPct" class="text-xs text-slate-500 mt-0.5">%0 tamamlandı</div>
         </div>
-        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <div class="text-xs font-medium text-slate-500">Atanmamış Ders</div>
+        <button id="m4KpiUnassignedCard" type="button" class="text-left bg-white rounded-xl border border-slate-200 hover:border-amber-400 hover:bg-amber-50/40 p-4 shadow-sm transition cursor-pointer">
+          <div class="flex items-center justify-between gap-1">
+            <span class="text-xs font-medium text-slate-500">Atanmamış Ders</span>
+            <span class="text-[10px] font-bold text-amber-700">Tümünü gör →</span>
+          </div>
           <div id="m4KpiUnassigned" class="text-2xl font-bold text-amber-600 mt-1">0</div>
           <div id="m4KpiCrossBranch" class="text-xs text-slate-500 mt-0.5">0 branş dışı atama</div>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <div class="text-xs font-medium text-slate-500">Yük Sınırı Aşan Öğretmen</div>
+        </button>
+        <button id="m4KpiLoadsCard" type="button" class="text-left bg-white rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/30 p-4 shadow-sm transition cursor-pointer">
+          <div class="flex items-center justify-between gap-1">
+            <span class="text-xs font-medium text-slate-500">Yük Sınırı Aşan Öğretmen</span>
+            <span class="text-[10px] font-bold text-indigo-700">Yüklere git →</span>
+          </div>
           <div id="m4KpiOverloaded" class="text-2xl font-bold text-slate-900 mt-1">0</div>
           <div id="m4KpiTeacherSummary" class="text-xs text-slate-500 mt-0.5">0 öğretmen aktif</div>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <div class="text-xs font-medium text-slate-500">Özel Mekan / Lab</div>
+        </button>
+        <button id="m4KpiRoomsCard" type="button" class="text-left bg-white rounded-xl border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/30 p-4 shadow-sm transition cursor-pointer">
+          <div class="flex items-center justify-between gap-1">
+            <span class="text-xs font-medium text-slate-500">Özel Mekan / Lab</span>
+            <span class="text-[10px] font-bold text-emerald-700">Mekanlar →</span>
+          </div>
           <div id="m4KpiRooms" class="text-2xl font-bold text-emerald-600 mt-1">0</div>
           <div class="text-xs text-slate-500 mt-0.5">Özel derslik kapasitesi</div>
-        </div>
+        </button>
       </div>
 
-      <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-        <div class="xl:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 pb-3.5">
-            <div class="flex flex-wrap items-center gap-2">
-              <select id="m4ClassFilter" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold bg-white focus:outline-none">
-                <option value="ALL">Tüm Şubeler</option>
-              </select>
-              <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer">
-                <input id="m4OnlyUnassigned" type="checkbox" class="w-3.5 h-3.5 rounded text-indigo-600" />
-                Sadece Atanmamışlar
-              </label>
-            </div>
-            <div class="relative w-full sm:w-52">
+      <!-- Menü 4 Modern Geniş Sekme Çubuğu -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-1.5 shadow-sm flex flex-wrap items-center gap-1.5" id="m4WorkspaceTabs">
+        <button type="button" data-m4-tab="assign" class="m4-ws-tab flex-1 min-w-[180px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition bg-indigo-600 text-white shadow-sm">
+          <i data-lucide="table-2" class="w-4 h-4"></i>
+          <span>Şube–Ders Atama Tablosu</span>
+          <span id="m4TabBadgeAssign" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-white/20 text-white">0</span>
+        </button>
+        <button type="button" data-m4-tab="loads" class="m4-ws-tab flex-1 min-w-[200px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition text-slate-700 hover:bg-slate-100">
+          <i data-lucide="users" class="w-4 h-4"></i>
+          <span>Öğretmen Ders Yükleri (Geniş Yönetim)</span>
+          <span id="m4LoadCountBadge" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-700">0</span>
+        </button>
+        <button type="button" data-m4-tab="rooms" class="m4-ws-tab inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition text-slate-700 hover:bg-slate-100">
+          <i data-lucide="door-open" class="w-4 h-4"></i>
+          <span>Özel Derslikler</span>
+          <span id="m4TabBadgeRooms" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700">0</span>
+        </button>
+      </div>
+
+      <!-- Sekme 1: Şube-Ders Atama Tablosu (Tam Genişlik) -->
+      <div id="m4PanelAssign" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 pb-3.5">
+          <div class="flex flex-wrap items-center gap-2">
+            <select id="m4ClassFilter" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold bg-white focus:outline-none">
+              <option value="ALL">Tüm Şubeler</option>
+            </select>
+            <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer">
+              <input id="m4OnlyUnassigned" type="checkbox" class="w-3.5 h-3.5 rounded text-indigo-600" />
+              Sadece Atanmamışlar
+            </label>
+          </div>
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-64">
               <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
-              <input id="m4Search" type="text" placeholder="Ders, şube veya öğretmen..." class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+              <input id="m4Search" type="text" placeholder="Ders, şube veya öğretmen ara..." class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
             </div>
-          </div>
-
-          <div id="m4AssignTableWrap" class="overflow-x-auto"></div>
-        </div>
-
-        <div class="xl:col-span-4 space-y-5">
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-3">
-            <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-              <div class="flex items-center gap-2">
-                <i data-lucide="bar-chart-3" class="w-4 h-4 text-indigo-600"></i>
-                <div>
-                  <h3 class="text-sm font-bold text-slate-900">Öğretmen Ders Yükleri</h3>
-                  <p class="text-[10px] text-slate-400">Ders detayını görmek ve aktarmak için öğretmene tıklayın</p>
-                </div>
-              </div>
-              <span id="m4LoadCountBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">0</span>
-            </div>
-            <div class="space-y-2">
-              <div class="relative">
-                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2"></i>
-                <input id="m4LoadSearch" type="text" placeholder="Öğretmen veya branş ara..." class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50/70 text-xs focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-              </div>
-              <div class="flex flex-wrap items-center gap-1" id="m4LoadFilterPills">
-                <button type="button" data-load-filter="ALL" class="m4-lf-btn px-2 py-1 rounded-md text-[10px] font-semibold bg-indigo-600 text-white transition">Tümü</button>
-                <button type="button" data-load-filter="OVER" class="m4-lf-btn px-2 py-1 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Yük Aşan</button>
-                <button type="button" data-load-filter="ACTIVE" class="m4-lf-btn px-2 py-1 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Dersi Olan</button>
-                <button type="button" data-load-filter="EMPTY" class="m4-lf-btn px-2 py-1 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Derssiz</button>
-              </div>
-            </div>
-            <div id="m4TeacherLoadList" class="space-y-2.5 max-h-[540px] overflow-y-auto pr-1"></div>
-          </div>
-
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-3">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div class="flex items-center gap-2">
-                <i data-lucide="door-open" class="w-4 h-4 text-emerald-600"></i>
-                <h3 class="text-sm font-bold text-slate-900">Özel Mekan / Derslikler</h3>
-              </div>
-              <button id="btnM4AddRoomSmall" type="button" class="text-xs font-semibold text-emerald-700 hover:underline">+ Ekle</button>
-            </div>
-            <div id="m4RoomList" class="space-y-2"></div>
+            <button id="btnM4ResetFilters" type="button" class="hidden px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold whitespace-nowrap transition">
+              Filtreyi Temizle
+            </button>
           </div>
         </div>
+        <div id="m4FilterStatusBanner" class="hidden"></div>
+        <div id="m4AssignTableWrap" class="overflow-x-auto"></div>
+      </div>
+
+      <!-- Sekme 2: Öğretmen Ders Yükleri (Tam Genişlik · Modern Kart Izgarası) -->
+      <div id="m4PanelLoads" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-4">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b border-slate-100 pb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-slate-900">Öğretmen Ders Yükleri — Geniş Yönetim Merkezi</h3>
+              <p class="text-xs text-slate-500">Her öğretmenin derslerini ve bloklarını görün; doğrudan ders ekleyin, saat/blok düzeltin, başka öğretmene aktarın veya silin.</p>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="btnM4GlobalAddCourse" type="button" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i> Ders Ekle / Öğretmene Ata
+            </button>
+          </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div class="relative flex-1 max-w-md">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input id="m4LoadSearch" type="text" placeholder="Öğretmen, branş, ders veya şube ara..." class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-xs focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5" id="m4LoadFilterPills">
+            <button type="button" data-load-filter="ALL" class="m4-lf-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white transition">Tümü</button>
+            <button type="button" data-load-filter="OVER" class="m4-lf-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Yük Aşanlar</button>
+            <button type="button" data-load-filter="ACTIVE" class="m4-lf-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Dersi Olanlar</button>
+            <button type="button" data-load-filter="EMPTY" class="m4-lf-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Derssizler</button>
+          </div>
+        </div>
+
+        <div id="m4TeacherLoadBulkHost"></div>
+        <div id="m4TeacherLoadList" class="grid grid-cols-1 lg:grid-cols-2 gap-4"></div>
+      </div>
+
+      <!-- Sekme 3: Özel Mekan / Derslikler -->
+      <div id="m4PanelRooms" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div class="flex items-center gap-2.5">
+            <i data-lucide="door-open" class="w-5 h-5 text-emerald-600"></i>
+            <div>
+              <h3 class="text-base font-bold text-slate-900">Özel Mekan / Derslikler</h3>
+              <p class="text-xs text-slate-500">Bilişim, Fen Lab, Spor Salonu, Müzik Odası, Görsel Sanatlar Atölyesi vb. kapasitelerini yönetin.</p>
+            </div>
+          </div>
+          <button id="btnM4AddRoomSmall" type="button" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition">+ Yeni Mekan Ekle</button>
+        </div>
+        <div id="m4RoomList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
       </div>
 
       <div class="bg-gradient-to-r from-indigo-600 to-slate-900 rounded-2xl p-5 sm:p-6 text-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-md">
@@ -2045,22 +2092,133 @@
     </div>
   </div>
 
+  <!-- Modal: Öğretmen Ders Yüklerinden Ders Ekle / Ata -->
+  <div id="m4TeacherAddCourseModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-emerald-50/60">
+        <div>
+          <h3 id="m4AddCourseTitle" class="text-base font-bold text-slate-900">Ders Ekle ve Öğretmen Ata</h3>
+          <p id="m4AddCourseSubtitle" class="text-xs text-slate-500 mt-0.5">Mevcut atanmamış bir dersi atayın ya da şubeye yeni ders ekleyip istediğiniz öğretmene atayın.</p>
+        </div>
+        <button id="btnCloseM4AddCourse" type="button" class="p-1.5 rounded-lg text-slate-400 hover:bg-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div class="p-5 overflow-y-auto space-y-4">
+        <div class="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100">
+          <button type="button" data-m4-add-mode="existing" class="m4-add-mode-btn py-2 px-3 rounded-lg text-xs font-bold bg-white text-indigo-700 shadow-xs transition">Atanmamış Dersten Seç</button>
+          <button type="button" data-m4-add-mode="new" class="m4-add-mode-btn py-2 px-3 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">Şubeye Yeni Ders Ekle</button>
+        </div>
+
+        <!-- Mod A: Mevcut Atanmamış Derslerden Ata -->
+        <div id="m4AddModeExisting" class="space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Atanmamış Ders Seçin</label>
+            <select id="m4AddExistingCourseSel" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Atanacak Öğretmen (İsterseniz Başka Öğretmen Seçebilirsiniz)</label>
+            <select id="m4AddExistingTeacherSel" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"></select>
+          </div>
+        </div>
+
+        <!-- Mod B: Şubeye Yeni Ders Ekle ve Öğretmen Ata -->
+        <div id="m4AddModeNew" class="hidden space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Şube Seçin</label>
+              <select id="m4AddNewClassSel" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"></select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">MEB Şablonundan Hızlı Seç (Opsiyonel)</label>
+              <select id="m4AddNewTemplateSel" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"></select>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Ders Adı</label>
+              <input id="m4AddNewName" type="text" placeholder="Örn: Robotik Kodlama" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Kod</label>
+              <input id="m4AddNewCode" type="text" placeholder="Örn: ROB" maxlength="10" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-mono uppercase focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Tür</label>
+              <select id="m4AddNewCategory" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white">
+                <option value="secmeli">Seçmeli Ders</option>
+                <option value="zorunlu">Zorunlu / Ortak</option>
+                <option value="meslek">Alan / Meslek</option>
+                <option value="harici">Harici / Destek</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Haftalık Saat</label>
+              <input id="m4AddNewHours" type="number" min="1" max="20" value="2" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-bold" />
+            </div>
+            <div class="col-span-2 sm:col-span-1">
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Blok (Örn: 2 veya 2+1)</label>
+              <input id="m4AddNewBlocks" type="text" placeholder="Otomatik" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-mono" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Atanacak Öğretmen (Bu veya Başka Öğretmen Seçilebilir)</label>
+            <select id="m4AddNewTeacherSel" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"></select>
+          </div>
+        </div>
+      </div>
+      <div class="px-5 py-3.5 border-t border-slate-100 bg-slate-50/70 flex items-center justify-end gap-2">
+        <button id="btnCancelM4AddCourse" type="button" class="px-3.5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700">İptal</button>
+        <button id="btnSubmitM4AddCourse" type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white shadow-sm">
+          <i data-lucide="check" class="w-3.5 h-3.5"></i> Kaydet ve Ata
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Akıllı Seçmeli Ders Öner ve Ata -->
+  <div id="m4ElectiveSuggestModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-amber-50/70">
+        <div>
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="lightbulb" class="w-5 h-5 text-amber-600"></i>
+            Akıllı Seçmeli Ders Öner ve Ata
+          </h3>
+          <p class="text-xs text-slate-600 mt-0.5">Haftalık saati eksik şubeler için MEB/TTKB kurallarına uygun seçmeli dersler ve boş kapasiteli öğretmenler önerilir. Onay sonrası dilediğiniz değişikliği yapabilirsiniz.</p>
+        </div>
+        <button id="btnCloseM4Suggest" type="button" class="p-1.5 rounded-lg text-slate-400 hover:bg-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div id="m4SuggestSummaryBar" class="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs"></div>
+      <div id="m4SuggestListBody" class="p-5 overflow-y-auto space-y-4 flex-1"></div>
+      <div class="px-5 py-3.5 border-t border-slate-100 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2">
+        <span class="text-[11px] text-slate-500">Bir sınıfa aynı ders birden fazla kez önerilmez; sonradan silebilir veya öğretmenini değiştirebilirsiniz.</span>
+        <div class="flex items-center gap-2 ml-auto">
+          <button id="btnCancelM4Suggest" type="button" class="px-3.5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700">İptal</button>
+          <button id="btnConfirmM4Suggest" type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-xs font-bold text-white shadow-sm">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Seçilenleri Şubelere Ekle ve Ata
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast" class="fixed bottom-20 lg:bottom-5 right-4 lg:right-5 z-50 hidden items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-medium shadow-lg border border-slate-700">
     <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
     <span id="toastText">Kaydedildi</span>
   </div>
 
-  <script src="./editor_logic.js?v=1.0.7"></script>
-  <script src="./export_engine.js?v=1.0.7"></script>
-  <script src="./duty_module.js?v=1.0.7"></script>
-  <script src="./web_evrakplus_bridge.js?v=1.0.7"></script>
-  <script src="./evrakplus_ui.js?v=1.0.7"></script>
-  <script src="./system_ui.js?v=1.0.7"></script>
-  <script src="./pwa_install.js?v=1.0.7"></script>
-  <script src="./clubs_module.js?v=1.0.7"></script>
-  <script src="./multi_solver_ui.js?v=1.0.7"></script>
-  <script src="./meb_curriculum.js?v=1.0.7"></script>
-  <script src="./app.js?v=1.0.7"></script>
+  <script src="./editor_logic.js?v=1.0.8"></script>
+  <script src="./export_engine.js?v=1.0.8"></script>
+  <script src="./duty_module.js?v=1.0.8"></script>
+  <script src="./web_evrakplus_bridge.js?v=1.0.8"></script>
+  <script src="./evrakplus_ui.js?v=1.0.8"></script>
+  <script src="./system_ui.js?v=1.0.8"></script>
+  <script src="./pwa_install.js?v=1.0.8"></script>
+  <script src="./clubs_module.js?v=1.0.8"></script>
+  <script src="./multi_solver_ui.js?v=1.0.8"></script>
+  <script src="./meb_curriculum.js?v=1.0.8"></script>
+  <script src="./app.js?v=1.0.8"></script>
 </body>
 </html>

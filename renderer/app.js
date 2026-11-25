@@ -2178,16 +2178,17 @@ function executeM4Transfer(unassignOnly = false) {
         let changed = false;
         if (c.teacherId === srcId) { c.teacherId = targetId; movedCount++; changed = true; }
         if (c.splitGroups && c.teacherId2 === srcId) { c.teacherId2 = targetId; movedCount++; changed = true; }
-        if (changed) unplacedCount += unplaceAssignmentFromSolution(cls.id, c.id);
+        if (changed) unplacedCount += unplaceAssignmentFromSolution(cls, c, srcId, targetId);
       });
     });
   } else {
     const cls = classes.find((x) => x.id === m4TransferContext.classId);
     const c = cls && (cls.courses || []).find((x) => x.id === m4TransferContext.courseId);
     if (c) {
+      const oldTid = m4TransferContext.slot === 2 ? c.teacherId2 : c.teacherId;
       if (m4TransferContext.slot === 2) c.teacherId2 = targetId;
       else c.teacherId = targetId;
-      unplacedCount += unplaceAssignmentFromSolution(cls.id, c.id);
+      unplacedCount += unplaceAssignmentFromSolution(cls, c, oldTid, targetId);
       movedCount = 1;
     }
   }
@@ -2331,18 +2332,48 @@ function renderMenu4() {
   document.getElementById('m4KpiOverloaded').className = 'text-2xl font-bold mt-1 ' + (overloaded > 0 ? 'text-rose-600' : 'text-emerald-600');
   document.getElementById('m4KpiTeacherSummary').textContent = `${teachers.length} öğretmen kayıtlı`;
   document.getElementById('m4KpiRooms').textContent = `${rooms.length} mekan`;
+  const tabBadgeAssign = document.getElementById('m4TabBadgeAssign');
+  if (tabBadgeAssign) tabBadgeAssign.textContent = unassignedCount > 0 ? `${unassignedCount} boş` : `${flatRows.length} ders`;
+  const tabBadgeRooms = document.getElementById('m4TabBadgeRooms');
+  if (tabBadgeRooms) tabBadgeRooms.textContent = `${rooms.length}`;
 
+  // Geniş Sekme Görünümünü Güncelle
+  if (!window._m4ActiveTab) window._m4ActiveTab = 'assign';
+  const activeTab = window._m4ActiveTab;
+  document.getElementById('m4PanelAssign')?.classList.toggle('hidden', activeTab !== 'assign');
+  document.getElementById('m4PanelLoads')?.classList.toggle('hidden', activeTab !== 'loads');
+  document.getElementById('m4PanelRooms')?.classList.toggle('hidden', activeTab !== 'rooms');
+  document.querySelectorAll('.m4-ws-tab').forEach((btn) => {
+    const isAct = btn.dataset.m4Tab === activeTab;
+    btn.className = `m4-ws-tab ${btn.dataset.m4Tab === 'rooms' ? '' : 'flex-1 min-w-[180px] '}inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition ${isAct ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100'}`;
+  });
+
+  // Filtre Durumunu Doğrula ve Girdileri Senkronize Et (Gizli Filtre Hatasını Önler)
+  if (state.m4ClassFilter && state.m4ClassFilter !== 'ALL' && !classes.some((c) => c.id === state.m4ClassFilter)) {
+    state.m4ClassFilter = 'ALL';
+  }
   const clsFilter = document.getElementById('m4ClassFilter');
   clsFilter.innerHTML = `<option value="ALL">Tüm Şubeler (${classes.length})</option>` +
     classes.map((cls) => `<option value="${cls.id}" ${state.m4ClassFilter === cls.id ? 'selected' : ''}>${escapeHtml(cls.name)}</option>`).join('');
+  const searchInputEl = document.getElementById('m4Search');
+  if (searchInputEl && searchInputEl.value !== (state.m4Search || '')) searchInputEl.value = state.m4Search || '';
+  const onlyUnassEl = document.getElementById('m4OnlyUnassigned');
+  if (onlyUnassEl) onlyUnassEl.checked = Boolean(state.m4OnlyUnassigned);
 
   const tableWrap = document.getElementById('m4AssignTableWrap');
+  const filterBannerEl = document.getElementById('m4FilterStatusBanner');
+  const btnResetFilters = document.getElementById('btnM4ResetFilters');
   if (classes.length === 0 || flatRows.length === 0) {
+    if (filterBannerEl) filterBannerEl.classList.add('hidden');
+    if (btnResetFilters) btnResetFilters.classList.add('hidden');
     tableWrap.innerHTML = `<div class="py-12 px-4 text-center space-y-3"><div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto"><i data-lucide="clipboard-list" class="w-6 h-6"></i></div><div class="text-sm font-bold text-slate-800">Atanacak Şube veya Ders Bulunamadı</div><p class="text-xs text-slate-500 max-w-md mx-auto">Önce Menü 2'den şube ve dersleri, Menü 3'ten öğretmenlerinizi ekleyin.</p></div>`;
   } else if (teachers.length === 0) {
+    if (filterBannerEl) filterBannerEl.classList.add('hidden');
+    if (btnResetFilters) btnResetFilters.classList.add('hidden');
     tableWrap.innerHTML = `<div class="py-12 px-4 text-center space-y-3"><div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto"><i data-lucide="user-plus" class="w-6 h-6"></i></div><div class="text-sm font-bold text-slate-800">Henüz Öğretmen Eklenmedi</div><p class="text-xs text-slate-500 max-w-md mx-auto">Ders ataması için Menü 3'ten öğretmen kadronuzu oluşturun.</p></div>`;
   } else {
     const q = (state.m4Search || '').trim().toLocaleLowerCase('tr-TR');
+    const hasAnyFilter = (state.m4ClassFilter && state.m4ClassFilter !== 'ALL') || Boolean(state.m4OnlyUnassigned) || Boolean(q);
     const filtered = flatRows.filter((row) => {
       if (state.m4ClassFilter !== 'ALL' && row.cls.id !== state.m4ClassFilter) return false;
       if (state.m4OnlyUnassigned && row.isAssigned) return false;
@@ -2354,8 +2385,33 @@ function renderMenu4() {
       return true;
     });
 
+    if (btnResetFilters) btnResetFilters.classList.toggle('hidden', !hasAnyFilter);
+    if (filterBannerEl) {
+      if (hasAnyFilter) {
+        const activeParts = [];
+        if (state.m4ClassFilter !== 'ALL') {
+          const fc = classes.find((x) => x.id === state.m4ClassFilter);
+          activeParts.push(`Şube: ${fc ? fc.name : state.m4ClassFilter}`);
+        }
+        if (state.m4OnlyUnassigned) activeParts.push('Sadece Atanmamışlar');
+        if (q) activeParts.push(`Arama: "${state.m4Search}"`);
+        filterBannerEl.className = 'rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 text-xs';
+        filterBannerEl.innerHTML = `<div class="text-amber-900 font-semibold">Aktif filtre (${escapeHtml(activeParts.join(' · '))}): Toplam <strong>${flatRows.length}</strong> dersten <strong>${filtered.length}</strong> tanesi gösteriliyor${unassignedCount > 0 ? ` (${unassignedCount} atanmamış ders mevcut)` : ''}.</div><button type="button" id="btnM4BannerReset" class="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold transition">Tüm Dersleri Göster</button>`;
+        document.getElementById('btnM4BannerReset')?.addEventListener('click', () => {
+          state.m4ClassFilter = 'ALL'; state.m4OnlyUnassigned = false; state.m4Search = '';
+          saveState(); renderMenu4();
+        });
+      } else {
+        filterBannerEl.classList.add('hidden');
+      }
+    }
+
     if (filtered.length === 0) {
-      tableWrap.innerHTML = `<div class="py-8 text-center text-xs text-slate-400">Seçili filtreye uyan ders bulunamadı.</div>`;
+      tableWrap.innerHTML = `<div class="py-8 text-center space-y-2"><div class="text-xs text-slate-500">Seçili filtreye uyan ders bulunamadı.</div><button type="button" id="btnM4EmptyReset" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold">Tüm Filtreleri Temizle</button></div>`;
+      document.getElementById('btnM4EmptyReset')?.addEventListener('click', () => {
+        state.m4ClassFilter = 'ALL'; state.m4OnlyUnassigned = false; state.m4Search = '';
+        saveState(); renderMenu4();
+      });
     } else {
       tableWrap.innerHTML = `
         <table class="w-full text-left text-xs border-collapse min-w-[660px]">
@@ -2451,32 +2507,36 @@ function renderMenu4() {
     if (!validLoadKeySet.has(k)) selLoadKeys.delete(k);
   }
 
+  const bulkHostEl = document.getElementById('m4TeacherLoadBulkHost');
   if (teachers.length === 0) {
-    loadListEl.innerHTML = `<div class="py-6 text-center text-xs text-slate-400">Henüz öğretmen eklenmedi.</div>`;
+    if (bulkHostEl) bulkHostEl.innerHTML = '';
+    loadListEl.innerHTML = `<div class="col-span-full py-10 text-center text-xs text-slate-400">Henüz öğretmen eklenmedi.</div>`;
   } else if (filteredTeachers.length === 0) {
-    loadListEl.innerHTML = `<div class="py-6 text-center text-xs text-slate-400">Filtreye uyan öğretmen bulunamadı.</div>`;
+    if (bulkHostEl) bulkHostEl.innerHTML = '';
+    loadListEl.innerHTML = `<div class="col-span-full py-10 text-center text-xs text-slate-400">Filtreye uyan öğretmen bulunamadı.</div>`;
   } else {
     const bulkBarHtml = selLoadKeys.size > 0 ? `
-      <div class="sticky top-0 z-10 rounded-xl border border-indigo-300 bg-indigo-50/95 backdrop-blur p-2.5 shadow-sm space-y-2 mb-2">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <span class="text-xs font-extrabold text-indigo-900">${selLoadKeys.size} ders seçildi</span>
-          <button type="button" id="btnM4BulkClearSel" class="text-[11px] font-semibold text-slate-600 hover:text-slate-900 underline">Seçimi Temizle</button>
+      <div class="sticky top-2 z-20 rounded-xl border border-indigo-300 bg-indigo-50/95 backdrop-blur p-3 shadow-md flex flex-wrap items-center justify-between gap-2.5">
+        <div class="flex items-center gap-2">
+          <span class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-xs font-extrabold">${selLoadKeys.size} ders seçildi</span>
+          <button type="button" id="btnM4BulkClearSel" class="text-xs font-semibold text-slate-600 hover:text-slate-900 underline">Seçimi Temizle</button>
         </div>
-        <div class="flex flex-wrap items-center gap-1.5">
-          <select id="m4BulkTargetTeacher" class="flex-1 min-w-[140px] px-2 py-1.5 rounded-lg border border-indigo-200 bg-white text-[11px] font-semibold text-slate-800">
+        <div class="flex flex-wrap items-center gap-2">
+          <select id="m4BulkTargetTeacher" class="min-w-[210px] px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-white text-xs font-semibold text-slate-800">
             <option value="">Hedef öğretmen seçin...</option>
             ${teachers.map((tt) => {
               const li = loadMap[tt.id] ? loadMap[tt.id].totalHours : 0;
               return `<option value="${tt.id}">${escapeHtml(tt.name)} (${escapeHtml(tt.branch)} · ${li}/${tt.maxHours || 30}s)</option>`;
             }).join('')}
           </select>
-          <button type="button" id="btnM4BulkTransferSelected" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold transition">Aktar</button>
-          <button type="button" id="btnM4BulkRemoveSelected" class="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold transition">Öğretmenlerden Al</button>
+          <button type="button" id="btnM4BulkTransferSelected" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition">Seçilenleri Aktar</button>
+          <button type="button" id="btnM4BulkRemoveSelected" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition">Öğretmenlerden Al</button>
         </div>
       </div>
     ` : '';
+    if (bulkHostEl) bulkHostEl.innerHTML = bulkBarHtml;
 
-    loadListEl.innerHTML = bulkBarHtml + filteredTeachers.map((t) => {
+    loadListEl.innerHTML = filteredTeachers.map((t) => {
       const info = loadMap[t.id] || { totalHours: 0, coursesSummary: {}, crossBranchHours: 0, assignments: [] };
       const maxH = Math.max(1, Number(t.maxHours) || 30);
       const minH = Number(t.minHours) || 1;
@@ -2496,92 +2556,108 @@ function renderMenu4() {
             : 'bg-indigo-600 text-white';
       const barColor = isOver ? 'bg-rose-500' : (isEmpty ? 'bg-slate-300' : (isBelowMin ? 'bg-amber-400' : 'bg-emerald-500'));
       const statusBadge = isOver
-        ? `<span class="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[9px] font-bold">+${info.totalHours - maxH}s Aşım</span>`
+        ? `<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold">+${info.totalHours - maxH}s Aşım</span>`
         : isEmpty
-          ? `<span class="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-semibold">Derssiz</span>`
-          : `<span class="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-semibold">${remaining > 0 ? `+${remaining}s boş` : 'Tam dolu'}</span>`;
+          ? `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-semibold">Derssiz</span>`
+          : `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-semibold">${remaining > 0 ? `+${remaining}s boş` : 'Tam dolu'}</span>`;
 
       const tAllKeys = info.assignments.map((a) => `${t.id}::${a.classId}::${a.courseId}::${a.slot}`);
       const allSelected = tAllKeys.length > 0 && tAllKeys.every((k) => selLoadKeys.has(k));
 
       const expandedRows = info.assignments.length === 0
-        ? `<div class="py-2 text-center text-[11px] text-slate-400">Bu öğretmene henüz ders atanmamış.</div>`
+        ? `<div class="py-4 text-center text-xs text-slate-400 bg-white/70 rounded-lg border border-dashed border-slate-200">Bu öğretmene henüz ders atanmamış. Aşağıdan <strong>+ Ders Ekle / Ata</strong> ile hemen ekleyebilirsiniz.</div>`
         : info.assignments.map((a) => {
           const k = `${t.id}::${a.classId}::${a.courseId}::${a.slot}`;
           const checked = selLoadKeys.has(k);
           const blkText = (Array.isArray(a.blocks) && a.blocks.length ? a.blocks : [a.hours]).join('+');
           return `
-          <div class="flex items-center justify-between gap-1.5 py-1.5 px-2 rounded-lg border transition ${checked ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200/80 hover:border-indigo-300'}">
-            <label class="min-w-0 flex items-center gap-1.5 flex-1 cursor-pointer">
+          <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 py-2 px-2.5 rounded-xl border transition ${checked ? 'bg-indigo-50/80 border-indigo-300' : 'bg-white border-slate-200/80 hover:border-indigo-300'}">
+            <label class="min-w-0 flex items-center gap-2 flex-1 cursor-pointer">
               <input type="checkbox" class="m4-load-chk rounded border-slate-300 text-indigo-600 shrink-0" data-load-key="${escapeHtml(k)}" ${checked ? 'checked' : ''} />
-              <span class="shrink-0 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px]">${escapeHtml(a.className)}</span>
+              <span class="shrink-0 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-extrabold text-[11px]">${escapeHtml(a.className)}</span>
               <div class="min-w-0">
-                <div class="text-[11px] font-semibold text-slate-800 truncate">${escapeHtml(a.courseName)}${a.slot === 2 ? ' <span class="text-[9px] text-indigo-600">(2.Grup)</span>' : ''}</div>
-                <div class="text-[10px] text-slate-500 flex flex-wrap items-center gap-1">
+                <div class="text-xs font-bold text-slate-800 truncate">${escapeHtml(a.courseName)}${a.slot === 2 ? ' <span class="text-[10px] text-indigo-600">(2.Grup)</span>' : ''}</div>
+                <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5 mt-0.5">
                   <span class="font-bold text-slate-700">${a.hours} sa</span>
-                  <span class="px-1 py-0.2 rounded bg-slate-100 text-slate-700 font-mono text-[9px] font-bold">Blok: ${blkText}</span>
-                  ${a.isCross ? '<span class="text-teal-700 font-semibold">· Branş dışı</span>' : ''}
+                  <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[10px] font-bold">Blok: ${blkText}</span>
+                  ${a.isCross ? '<span class="px-1.5 py-0.5 rounded bg-teal-50 text-teal-800 text-[10px] font-semibold">Branş dışı</span>' : ''}
                 </div>
               </div>
             </label>
             <div class="flex items-center gap-1 shrink-0">
               <button type="button"
-                class="m4-transfer-one inline-flex items-center gap-0.5 px-1.5 py-1 rounded-md bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white text-[10px] font-bold transition"
+                class="m4-edit-course-one inline-flex items-center px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white text-[10px] font-bold transition"
+                data-cls-id="${a.classId}" data-crs-id="${a.courseId}" title="Ders saatini, adını veya bloklarını düzelt">
+                Düzelt
+              </button>
+              <button type="button"
+                class="m4-transfer-one inline-flex items-center px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white text-[10px] font-bold transition"
                 data-src-tid="${t.id}" data-cls-id="${a.classId}" data-cls-name="${escapeHtml(a.className)}"
                 data-crs-id="${a.courseId}" data-crs-code="${escapeHtml(a.courseCode)}" data-crs-name="${escapeHtml(a.courseName)}"
-                data-hrs="${a.hours}" data-slot="${a.slot}" title="Dersi başka öğretmene değiştir/aktar">
+                data-hrs="${a.hours}" data-slot="${a.slot}" title="Başka öğretmene değiştir / aktar">
                 Değiştir
               </button>
               <button type="button"
-                class="m4-unassign-one inline-flex items-center px-1.5 py-1 rounded-md bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white text-[10px] font-bold transition"
+                class="m4-unassign-one inline-flex items-center px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-700 text-slate-700 hover:text-white text-[10px] font-bold transition"
                 data-src-tid="${t.id}" data-cls-id="${a.classId}" data-crs-id="${a.courseId}" data-slot="${a.slot}"
-                title="Bu dersi öğretmenden al / sil">
+                title="Dersi bu öğretmenden al (şubede boşa çıkar)">
                 Al
+              </button>
+              <button type="button"
+                class="m4-delete-course-one inline-flex items-center px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white text-[10px] font-bold transition"
+                data-cls-id="${a.classId}" data-crs-id="${a.courseId}" data-cls-name="${escapeHtml(a.className)}" data-crs-name="${escapeHtml(a.courseName)}"
+                title="Bu dersi şubeden tamamen sil">
+                Sil
               </button>
             </div>
           </div>`;
         }).join('');
 
       return `
-        <div class="rounded-xl border transition-all ${isOver ? 'border-rose-300 bg-rose-50/40' : 'border-slate-200 bg-slate-50/60 hover:border-indigo-300'}">
-          <div class="p-3 space-y-2">
+        <div class="rounded-2xl border shadow-xs transition-all flex flex-col ${isOver ? 'border-rose-300 bg-rose-50/30' : 'border-slate-200 bg-slate-50/50 hover:border-indigo-300'}">
+          <div class="p-4 space-y-2.5">
             <div class="flex items-start justify-between gap-2">
-              <div class="flex items-center gap-2 min-w-0 flex-1">
+              <div class="flex items-center gap-2.5 min-w-0 flex-1">
                 ${info.assignments.length > 0 ? `<input type="checkbox" class="m4-load-select-all-t rounded border-slate-300 text-indigo-600 shrink-0" data-selall-tid="${t.id}" title="Bu öğretmenin tüm derslerini seç" ${allSelected ? 'checked' : ''} />` : ''}
-                <button type="button" data-toggle-tid="${t.id}" class="m4-load-toggle flex items-center gap-2 min-w-0 flex-1 text-left">
-                  <div class="w-8 h-8 rounded-lg ${avatarCls} flex items-center justify-center text-[11px] font-bold shrink-0 shadow-xs">${escapeHtml(getTeacherInitials(t.name))}</div>
+                <button type="button" data-toggle-tid="${t.id}" class="m4-load-toggle flex items-center gap-2.5 min-w-0 flex-1 text-left">
+                  <div class="w-10 h-10 rounded-xl ${avatarCls} flex items-center justify-center text-xs font-extrabold shrink-0 shadow-xs">${escapeHtml(getTeacherInitials(t.name))}</div>
                   <div class="min-w-0">
-                    <div class="text-xs font-bold text-slate-900 truncate">${escapeHtml(t.name)}</div>
-                    <div class="text-[10px] text-slate-500 truncate">${escapeHtml(t.branch)} · ${info.assignments.length} ders${info.crossBranchHours > 0 ? ` · <span class="text-teal-700 font-semibold">${info.crossBranchHours}s branş dışı</span>` : ''}</div>
+                    <div class="text-sm font-bold text-slate-900 truncate">${escapeHtml(t.name)}</div>
+                    <div class="text-xs text-slate-500 truncate">${escapeHtml(t.branch)} · ${info.assignments.length} ders${info.crossBranchHours > 0 ? ` · <span class="text-teal-700 font-semibold">${info.crossBranchHours}s branş dışı</span>` : ''}</div>
                   </div>
                 </button>
               </div>
-              <button type="button" data-toggle-tid="${t.id}" class="m4-load-toggle flex flex-col items-end shrink-0 gap-0.5">
+              <button type="button" data-toggle-tid="${t.id}" class="m4-load-toggle flex flex-col items-end shrink-0 gap-1">
                 <div class="flex items-center gap-1">
-                  <span class="text-xs font-extrabold ${isOver ? 'text-rose-600' : 'text-slate-900'}">${info.totalHours}<span class="text-[10px] font-medium text-slate-400">/${maxH}s</span></span>
-                  <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-3.5 h-3.5 text-slate-400"></i>
+                  <span class="text-sm font-extrabold ${isOver ? 'text-rose-600' : 'text-slate-900'}">${info.totalHours}<span class="text-xs font-medium text-slate-400">/${maxH}s</span></span>
+                  <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4 text-slate-400"></i>
                 </div>
                 ${statusBadge}
               </button>
             </div>
-            <div class="w-full h-1.5 bg-slate-200/80 rounded-full overflow-hidden">
+            <div class="w-full h-2 bg-slate-200/80 rounded-full overflow-hidden">
               <div class="h-full ${barColor} rounded-full transition-all" style="width: ${ratio}%;"></div>
             </div>
           </div>
           ${isExpanded ? `
-            <div class="px-3 pb-3 pt-1 border-t border-slate-200/70 space-y-2">
+            <div class="px-4 pb-4 pt-2 border-t border-slate-200/70 space-y-2.5 flex-1 flex flex-col justify-between">
               <div class="space-y-1.5">${expandedRows}</div>
-              <div class="flex flex-wrap items-center justify-between gap-1.5 pt-1.5 border-t border-slate-200/60">
-                <button type="button" data-filter-tname="${escapeHtml(t.name)}" class="m4-filter-teacher inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-[10px] font-semibold text-slate-700 transition">
-                  <i data-lucide="filter" class="w-3 h-3"></i> Tabloda Göster
-                </button>
-                <div class="flex items-center gap-1">
+              <div class="flex flex-wrap items-center justify-between gap-1.5 pt-2.5 border-t border-slate-200/60">
+                <div class="flex items-center gap-1.5">
+                  <button type="button" data-add-for-tid="${t.id}" class="m4-add-course-for-t inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs transition">
+                    + Ders Ekle / Ata
+                  </button>
+                  <button type="button" data-filter-tname="${escapeHtml(t.name)}" class="m4-filter-teacher inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-semibold text-slate-700 transition">
+                    Tabloda Gör
+                  </button>
+                </div>
+                <div class="flex items-center gap-1.5">
                   ${info.assignments.length > 0 ? `
-                    <button type="button" data-unassign-all-tid="${t.id}" class="m4-unassign-all inline-flex items-center gap-1 px-2 py-1 rounded-md bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white text-[10px] font-bold transition">
+                    <button type="button" data-unassign-all-tid="${t.id}" class="m4-unassign-all inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white text-[11px] font-bold transition">
                       Tümünü Al
                     </button>
-                    <button type="button" data-bulk-tid="${t.id}" class="m4-transfer-bulk inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold shadow-xs transition">
-                      <i data-lucide="repeat" class="w-3 h-3"></i> Tümünü Aktar (${info.assignments.length})
+                    <button type="button" data-bulk-tid="${t.id}" class="m4-transfer-bulk inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold shadow-xs transition">
+                      Tümünü Aktar (${info.assignments.length})
                     </button>
                   ` : ''}
                 </div>
@@ -2591,6 +2667,34 @@ function renderMenu4() {
         </div>
       `;
     }).join('');
+
+    loadListEl.querySelectorAll('.m4-add-course-for-t').forEach((btn) => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openM4TeacherAddCourseModal(btn.dataset.addForTid);
+    }));
+
+    loadListEl.querySelectorAll('.m4-edit-course-one').forEach((btn) => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cls = classes.find((x) => x.id === btn.dataset.clsId);
+      const c = cls && (cls.courses || []).find((x) => x.id === btn.dataset.crsId);
+      if (!cls || !c) return;
+      state.selectedClassId = cls.id;
+      openCourseModal(c, c.category || 'zorunlu');
+    }));
+
+    loadListEl.querySelectorAll('.m4-delete-course-one').forEach((btn) => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cls = classes.find((x) => x.id === btn.dataset.clsId);
+      if (!cls) return;
+      const idx = (cls.courses || []).findIndex((x) => x.id === btn.dataset.crsId);
+      if (idx < 0) return;
+      const c = cls.courses[idx];
+      if (!confirm(`${cls.name} şubesinden "${c.name}" (${c.hours} sa) dersini kalıcı olarak silmek istiyor musunuz?`)) return;
+      unplaceAssignmentFromSolution(cls, c, c.teacherId, null);
+      cls.courses.splice(idx, 1);
+      saveState(); renderMenu4();
+      showToast(`${cls.name} - ${c.name} dersi şubeden silindi.`);
+    }));
 
     loadListEl.querySelectorAll('.m4-load-toggle').forEach((btn) => btn.addEventListener('click', () => {
       const tid = btn.dataset.toggleTid;
@@ -2707,6 +2811,9 @@ function renderMenu4() {
     loadListEl.querySelectorAll('.m4-filter-teacher').forEach((btn) => btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const name = btn.dataset.filterTname || '';
+      window._m4ActiveTab = 'assign';
+      state.m4ClassFilter = 'ALL';
+      state.m4OnlyUnassigned = false;
       state.m4Search = name;
       const searchEl = document.getElementById('m4Search');
       if (searchEl) searchEl.value = name;
@@ -2739,6 +2846,369 @@ function openRoomModal() {
   document.getElementById('rmName').value = '';
   document.getElementById('rmCap').value = '1';
   const m = document.getElementById('roomModal'); m.classList.remove('hidden'); m.classList.add('flex');
+}
+
+/* ---------- Menü 4: Öğretmen Ders Yüklerinden Ders Ekle / Başka Öğretmene Ata ---------- */
+let m4AddCourseMode = 'existing';
+
+function setM4AddCourseMode(mode) {
+  m4AddCourseMode = mode === 'new' ? 'new' : 'existing';
+  document.getElementById('m4AddModeExisting')?.classList.toggle('hidden', m4AddCourseMode !== 'existing');
+  document.getElementById('m4AddModeNew')?.classList.toggle('hidden', m4AddCourseMode !== 'new');
+  document.querySelectorAll('.m4-add-mode-btn').forEach((b) => {
+    const act = b.dataset.m4AddMode === m4AddCourseMode;
+    b.className = `m4-add-mode-btn py-2 px-3 rounded-lg text-xs font-bold transition ${act ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`;
+  });
+}
+
+function populateM4AddNewTemplates() {
+  const clsSel = document.getElementById('m4AddNewClassSel');
+  const tplSel = document.getElementById('m4AddNewTemplateSel');
+  if (!clsSel || !tplSel) return;
+  const cls = getCurrentClasses().find((x) => x.id === clsSel.value);
+  if (!cls) { tplSel.innerHTML = '<option value="">— Şube seçin —</option>'; return; }
+  const allTpls = [
+    ...getMebTemplatesForGrade(state.school.schoolTypeId, cls.gradeKey, 'elective'),
+    ...getMebTemplatesForGrade(state.school.schoolTypeId, cls.gradeKey, 'mandatory')
+  ].filter((t) => !findDuplicateCourseInClass(cls, t.code, t.name));
+  tplSel.innerHTML = `<option value="">— Manuel giriş veya şablon seçin (${allTpls.length}) —</option>` +
+    allTpls.map((t, i) => `<option value="${i}" data-code="${escapeHtml(t.code)}" data-name="${escapeHtml(t.name)}" data-cat="${escapeHtml(t.category)}" data-grp="${escapeHtml(t.group || '')}" data-hrs="${t.hours}">${escapeHtml(t.name)} (${t.hours} sa · ${escapeHtml(t.group || t.category)})</option>`).join('');
+}
+
+function openM4TeacherAddCourseModal(defaultTid = '') {
+  const classes = getCurrentClasses();
+  const teachers = getCurrentTeachers();
+  const loadMap = computeTeacherLoads();
+  if (!classes.length) { showToast('Önce Menü 2’den en az bir şube oluşturun.'); return; }
+  if (!teachers.length) { showToast('Önce Menü 3’ten en az bir öğretmen ekleyin.'); return; }
+
+  const defT = teachers.find((t) => t.id === defaultTid) || null;
+  const titleEl = document.getElementById('m4AddCourseTitle');
+  if (titleEl) titleEl.textContent = defT ? `${defT.name} — Ders Ekle / Ata` : 'Ders Ekle ve Öğretmen Ata';
+
+  const teacherOpts = `<option value="">— Öğretmen Atamadan Ekle —</option>` + teachers.map((t) => {
+    const ld = loadMap[t.id] ? loadMap[t.id].totalHours : 0;
+    return `<option value="${t.id}" ${t.id === defaultTid ? 'selected' : ''}>${escapeHtml(t.name)} (${escapeHtml(t.branch)} · ${ld}/${t.maxHours || 30} sa)</option>`;
+  }).join('');
+
+  // Mod A: Atanmamış dersler listesi
+  const unassignedList = [];
+  classes.forEach((cls) => (cls.courses || []).forEach((c) => {
+    if (!c.teacherId || !teachers.some((t) => t.id === c.teacherId)) {
+      unassignedList.push({ cls, c, slot: 1 });
+    } else if (c.splitGroups && (!c.teacherId2 || !teachers.some((t) => t.id === c.teacherId2))) {
+      unassignedList.push({ cls, c, slot: 2 });
+    }
+  }));
+  const exSel = document.getElementById('m4AddExistingCourseSel');
+  if (exSel) {
+    exSel.innerHTML = unassignedList.length === 0
+      ? '<option value="">Tüm mevcut dersler atanmış (Yeni Ders Ekle sekmesini kullanın)</option>'
+      : unassignedList.map((u) => `<option value="${u.cls.id}::${u.c.id}::${u.slot}">${escapeHtml(u.cls.name)} · ${escapeHtml(u.c.name)} (${u.c.hours} sa · Blok: ${getCourseBlocks(u.c).join('+')})${u.slot === 2 ? ' [2. Grup]' : ''}</option>`).join('');
+  }
+  const exTSel = document.getElementById('m4AddExistingTeacherSel');
+  if (exTSel) exTSel.innerHTML = teacherOpts;
+
+  // Mod B: Şubeye yeni ders ekle
+  const newClsSel = document.getElementById('m4AddNewClassSel');
+  if (newClsSel) {
+    newClsSel.innerHTML = classes.map((cls) => {
+      const ev = evaluateClass(cls);
+      const diff = ev.targetTotal - ev.totalHours;
+      const diffTxt = diff > 0 ? `${diff} sa eksik` : (diff < 0 ? `+${Math.abs(diff)} sa fazla` : 'Tam');
+      return `<option value="${cls.id}">${escapeHtml(cls.name)} (${ev.totalHours}/${ev.targetTotal} sa · ${diffTxt})</option>`;
+    }).join('');
+  }
+  populateM4AddNewTemplates();
+  const newTSel = document.getElementById('m4AddNewTeacherSel');
+  if (newTSel) newTSel.innerHTML = teacherOpts;
+  const nName = document.getElementById('m4AddNewName'); if (nName) nName.value = '';
+  const nCode = document.getElementById('m4AddNewCode'); if (nCode) nCode.value = '';
+  const nHrs = document.getElementById('m4AddNewHours'); if (nHrs) nHrs.value = '2';
+  const nBlks = document.getElementById('m4AddNewBlocks'); if (nBlks) nBlks.value = '';
+
+  setM4AddCourseMode(unassignedList.length > 0 ? 'existing' : 'new');
+  const m = document.getElementById('m4TeacherAddCourseModal');
+  m.classList.remove('hidden'); m.classList.add('flex');
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function closeM4TeacherAddCourseModal() {
+  const m = document.getElementById('m4TeacherAddCourseModal');
+  if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+}
+
+function submitM4TeacherAddCourse() {
+  const classes = getCurrentClasses();
+  const teachers = getCurrentTeachers();
+  if (m4AddCourseMode === 'existing') {
+    const val = document.getElementById('m4AddExistingCourseSel')?.value || '';
+    const tid = document.getElementById('m4AddExistingTeacherSel')?.value || '';
+    if (!val) { showToast('Atanacak boş ders seçilmedi.'); return; }
+    if (!tid) { showToast('Lütfen atanacak öğretmeni seçin.'); return; }
+    const [clsId, crsId, slotStr] = val.split('::');
+    const cls = classes.find((x) => x.id === clsId);
+    const c = cls && (cls.courses || []).find((x) => x.id === crsId);
+    if (!cls || !c) return;
+    if (Number(slotStr) === 2) c.teacherId2 = tid; else c.teacherId = tid;
+    const tObj = teachers.find((t) => t.id === tid);
+    if (window._m4CollapsedTeacherIds) window._m4CollapsedTeacherIds.delete(tid);
+    saveState(); closeM4TeacherAddCourseModal(); renderMenu4();
+    showToast(`${cls.name} - ${c.name} dersi ${tObj ? tObj.name : 'öğretmene'} atandı.`);
+  } else {
+    const clsId = document.getElementById('m4AddNewClassSel')?.value || '';
+    const cls = classes.find((x) => x.id === clsId);
+    if (!cls) { showToast('Lütfen şube seçin.'); return; }
+    const name = (document.getElementById('m4AddNewName')?.value || '').trim();
+    if (!name) { showToast('Lütfen ders adını girin.'); return; }
+    const code = (document.getElementById('m4AddNewCode')?.value || name.slice(0, 4)).trim().toUpperCase();
+    const category = document.getElementById('m4AddNewCategory')?.value || 'secmeli';
+    let hours = Math.max(1, Math.min(20, Number(document.getElementById('m4AddNewHours')?.value) || 2));
+    const blkRaw = (document.getElementById('m4AddNewBlocks')?.value || '').trim();
+    let blocks = defaultBlocksForHours(hours);
+    let blockMode = 'auto';
+    if (blkRaw) {
+      const parsed = blkRaw.split(/[+,\s]+/).map((n) => parseInt(n, 10)).filter((n) => n > 0);
+      if (parsed.length > 0) {
+        blocks = parsed;
+        hours = parsed.reduce((a, b) => a + b, 0);
+        blockMode = 'manual';
+      }
+    }
+    const dup = findDuplicateCourseInClass(cls, code, name);
+    if (dup) {
+      showToast(`${cls.name} şubesinde "${dup.name}" dersi zaten tanımlı! Bir sınıfa aynı ders birden fazla kez verilemez.`);
+      return;
+    }
+    const tid = document.getElementById('m4AddNewTeacherSel')?.value || null;
+    const tplSel = document.getElementById('m4AddNewTemplateSel');
+    const opt = tplSel && tplSel.selectedOptions && tplSel.selectedOptions[0];
+    const grp = (opt && opt.dataset && opt.dataset.grp) ? opt.dataset.grp : (category === 'secmeli' ? 'Seçmeli' : 'Ortak');
+    if (!cls.courses) cls.courses = [];
+    cls.courses.push({
+      id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      name, code, category, group: grp, hours, blocks, blockMode,
+      maxPerDay: 1, roomType: inferRoomType(name), splitGroups: false, useCommonSlot: false,
+      teacherId: tid || undefined
+    });
+    if (tid && window._m4CollapsedTeacherIds) window._m4CollapsedTeacherIds.delete(tid);
+    const tObj = tid ? teachers.find((t) => t.id === tid) : null;
+    saveState(); closeM4TeacherAddCourseModal(); renderMenu4();
+    showToast(`${cls.name} şubesine ${name} (${hours} sa) eklendi${tObj ? ` ve ${tObj.name} öğretmenine atandı` : ''}.`);
+  }
+}
+
+/* ---------- Menü 4: Akıllı Seçmeli Ders Öner ve Ata ---------- */
+let m4ElectiveProposals = [];
+
+function buildElectiveSuggestions() {
+  const classes = getCurrentClasses();
+  const teachers = getCurrentTeachers();
+  const loadMap = computeTeacherLoads();
+  const simHours = {};
+  teachers.forEach((t) => { simHours[t.id] = loadMap[t.id] ? loadMap[t.id].totalHours : 0; });
+
+  const pickBestTeacher = (courseName, courseCode, hrs) => {
+    if (!teachers.length) return null;
+    const scored = teachers.map((t) => {
+      const maxH = Number(t.maxHours) || 30;
+      const cur = simHours[t.id] || 0;
+      const free = maxH - cur;
+      const isMain = isBranchMatchingCourse(t.branch, courseName);
+      const isExtra = Boolean(window.DersDutyModule && window.DersDutyModule.doesTeacherExtraMatchCourse(t, courseName, courseCode));
+      let score = 0;
+      if (isMain) score += 100;
+      else if (isExtra) score += 60;
+      if (free >= hrs) score += 40 + Math.min(25, free);
+      else score -= 50;
+      return { t, score, free };
+    }).sort((a, b) => b.score - a.score);
+    const best = scored[0];
+    if (best && best.free >= hrs) {
+      simHours[best.t.id] = (simHours[best.t.id] || 0) + hrs;
+      return best.t.id;
+    }
+    return best ? best.t.id : null;
+  };
+
+  const proposals = [];
+  const threeGroups = ['İnsan, Toplum ve Bilim', 'Din, Ahlak ve Değer', 'Kültür, Sanat ve Spor'];
+
+  classes.forEach((cls) => {
+    const ev = evaluateClass(cls);
+    let remaining = ev.targetTotal - ev.totalHours;
+    if (remaining <= 0) return;
+
+    const pool = getMebTemplatesForGrade(state.school.schoolTypeId, cls.gradeKey, 'elective')
+      .filter((t) => !findDuplicateCourseInClass(cls, t.code, t.name));
+    if (!pool.length) return;
+
+    const existingGroups = new Set((cls.courses || []).filter((c) => c.category === 'secmeli').map((c) => c.group));
+    const chosen = [];
+    const chosenCodes = new Set();
+
+    const tryPickFrom = (candidates, targetMax) => {
+      for (const t of candidates) {
+        if (chosenCodes.has(t.code)) continue;
+        const opts = (Array.isArray(t.hourOptions) && t.hourOptions.length ? [...t.hourOptions] : [t.hours]).sort((a, b) => b - a);
+        const fitH = opts.find((h) => h <= targetMax);
+        if (!fitH) continue;
+        chosen.push({ ...t, hours: fitH, blocks: defaultBlocksForHours(fitH), blockMode: 'auto' });
+        chosenCodes.add(t.code);
+        return fitH;
+      }
+      return 0;
+    };
+
+    // 1. Önce eksik 3 zorunlu seçmeli gruptan birer ders seç (MEB kuralı)
+    const missingGroups = threeGroups.filter((g) => !existingGroups.has(g));
+    missingGroups.forEach((g) => {
+      if (remaining <= 0) return;
+      const cands = pool.filter((t) => t.group === g || (t.group && t.group.includes(g)));
+      // Kalan gruplara da en az 1'er saat yer bırak
+      const reserve = Math.max(0, missingGroups.filter((mg) => mg !== g && !chosen.some((x) => x.group === mg)).length - 1);
+      const maxForThis = Math.max(1, remaining - reserve);
+      const used = tryPickFrom(cands, maxForThis);
+      remaining -= used;
+    });
+
+    // 2. Kalan eksik saatleri diğer uygun seçmeli derslerle tamamla
+    let guard = 0;
+    while (remaining > 0 && guard < 15) {
+      guard++;
+      const used = tryPickFrom(pool, remaining);
+      if (used <= 0) break;
+      remaining -= used;
+    }
+
+    chosen.forEach((c) => {
+      const suggestedTid = pickBestTeacher(c.name, c.code, c.hours);
+      proposals.push({
+        key: `${cls.id}::${c.code}`,
+        checked: true,
+        classId: cls.id,
+        className: cls.name,
+        gradeKey: cls.gradeKey,
+        course: c,
+        teacherId: suggestedTid
+      });
+    });
+  });
+
+  return proposals;
+}
+
+function openM4ElectiveSuggestModal() {
+  const classes = getCurrentClasses();
+  const teachers = getCurrentTeachers();
+  if (!classes.length) { showToast('Önce Menü 2’den şubelerinizi oluşturun.'); return; }
+
+  m4ElectiveProposals = buildElectiveSuggestions();
+  const sumBar = document.getElementById('m4SuggestSummaryBar');
+  const bodyEl = document.getElementById('m4SuggestListBody');
+
+  if (m4ElectiveProposals.length === 0) {
+    sumBar.innerHTML = `<span class="font-bold text-emerald-700">Tüm şubelerin haftalık ders saatleri dolu veya uygun ek seçmeli ders bulunmadı.</span>`;
+    bodyEl.innerHTML = `<div class="py-10 text-center text-xs text-slate-500">Haftalık hedef saati eksik şube bulunmuyor. Tüm şubeler hedef saatine ulaşmış görünüyor.</div>`;
+  } else {
+    const classSet = new Set(m4ElectiveProposals.map((p) => p.classId));
+    const totalHrs = m4ElectiveProposals.reduce((s, p) => s + p.course.hours, 0);
+    sumBar.innerHTML = `
+      <div class="font-bold text-slate-800">${classSet.size} şube için toplam <span class="text-amber-700">${m4ElectiveProposals.length} seçmeli ders (${totalHrs} saat)</span> önerildi.</div>
+      <div class="flex items-center gap-2">
+        <button type="button" id="btnM4SugAll" class="text-indigo-700 font-bold hover:underline">Tümünü Seç</button>
+        <span class="text-slate-300">|</span>
+        <button type="button" id="btnM4SugNone" class="text-slate-600 font-semibold hover:underline">Temizle</button>
+      </div>
+    `;
+
+    const loadMap = computeTeacherLoads();
+    const byClass = new Map();
+    m4ElectiveProposals.forEach((p, idx) => {
+      if (!byClass.has(p.classId)) byClass.set(p.classId, []);
+      byClass.get(p.classId).push({ ...p, idx });
+    });
+
+    bodyEl.innerHTML = Array.from(byClass.entries()).map(([clsId, items]) => {
+      const cls = classes.find((x) => x.id === clsId);
+      const ev = cls ? evaluateClass(cls) : { totalHours: 0, targetTotal: 0 };
+      const addH = items.reduce((s, x) => s + x.course.hours, 0);
+      return `
+        <div class="rounded-xl border border-slate-200 overflow-hidden">
+          <div class="px-3.5 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
+            <div class="text-xs font-extrabold text-indigo-900">${escapeHtml(cls ? cls.name : clsId)}</div>
+            <div class="text-[11px] font-semibold text-slate-600">Mevcut: ${ev.totalHours} sa + Öneri: <strong class="text-amber-700">+${addH} sa</strong> → <strong>${ev.totalHours + addH} / ${ev.targetTotal} sa</strong></div>
+          </div>
+          <div class="divide-y divide-slate-100">
+            ${items.map((it) => `
+              <div class="px-3.5 py-2 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 bg-white hover:bg-slate-50/70">
+                <label class="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
+                  <input type="checkbox" class="m4-sug-chk rounded border-slate-300 text-amber-600" data-sug-idx="${it.idx}" ${it.checked ? 'checked' : ''} />
+                  <div class="min-w-0">
+                    <div class="text-xs font-bold text-slate-800 truncate">${escapeHtml(it.course.name)} <span class="font-mono text-[10px] text-slate-400">(${escapeHtml(it.course.code)})</span></div>
+                    <div class="text-[10px] text-slate-500">${escapeHtml(it.course.group || 'Seçmeli')} · <strong>${it.course.hours} sa</strong> · Blok: ${it.course.blocks.join('+')}</div>
+                  </div>
+                </label>
+                <select data-sug-tidx="${it.idx}" class="m4-sug-tsel w-full sm:w-64 px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-medium text-slate-700">
+                  <option value="">— Öğretmen Atamadan Ekle —</option>
+                  ${teachers.map((t) => {
+                    const ld = loadMap[t.id] ? loadMap[t.id].totalHours : 0;
+                    return `<option value="${t.id}" ${t.id === it.teacherId ? 'selected' : ''}>${escapeHtml(t.name)} (${escapeHtml(t.branch)} · ${ld}/${t.maxHours || 30}s)</option>`;
+                  }).join('')}
+                </select>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    bodyEl.querySelectorAll('.m4-sug-chk').forEach((chk) => chk.addEventListener('change', () => {
+      const i = Number(chk.dataset.sugIdx);
+      if (m4ElectiveProposals[i]) m4ElectiveProposals[i].checked = chk.checked;
+    }));
+    bodyEl.querySelectorAll('.m4-sug-tsel').forEach((sel) => sel.addEventListener('change', () => {
+      const i = Number(sel.dataset.sugTidx);
+      if (m4ElectiveProposals[i]) m4ElectiveProposals[i].teacherId = sel.value || null;
+    }));
+    document.getElementById('btnM4SugAll')?.addEventListener('click', () => {
+      m4ElectiveProposals.forEach((p) => { p.checked = true; });
+      bodyEl.querySelectorAll('.m4-sug-chk').forEach((c) => { c.checked = true; });
+    });
+    document.getElementById('btnM4SugNone')?.addEventListener('click', () => {
+      m4ElectiveProposals.forEach((p) => { p.checked = false; });
+      bodyEl.querySelectorAll('.m4-sug-chk').forEach((c) => { c.checked = false; });
+    });
+  }
+
+  const m = document.getElementById('m4ElectiveSuggestModal');
+  m.classList.remove('hidden'); m.classList.add('flex');
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function closeM4ElectiveSuggestModal() {
+  const m = document.getElementById('m4ElectiveSuggestModal');
+  if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+}
+
+function confirmM4ElectiveSuggestions() {
+  const classes = getCurrentClasses();
+  let added = 0; let assigned = 0;
+  m4ElectiveProposals.filter((p) => p.checked).forEach((p) => {
+    const cls = classes.find((x) => x.id === p.classId);
+    if (!cls) return;
+    if (!cls.courses) cls.courses = [];
+    if (findDuplicateCourseInClass(cls, p.course.code, p.course.name)) return;
+    cls.courses.push({
+      ...p.course,
+      id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      teacherId: p.teacherId || undefined
+    });
+    added++;
+    if (p.teacherId) assigned++;
+  });
+  saveState(); closeM4ElectiveSuggestModal(); renderAll();
+  showToast(added > 0 ? `${added} seçmeli ders şubelere eklendi (${assigned} öğretmen atandı).` : 'Eklenecek yeni seçmeli ders seçilmedi.');
 }
 
 /* =========================================================================
@@ -5482,6 +5952,7 @@ function bindEvents() {
       showToast(`${name} (${hours} sa) eklendi`);
     }
     saveState(); closeCm(); renderMenu2();
+    if (state.activeView === 'menu4') renderMenu4();
   });
 
   // Menü Geçişleri
@@ -5572,9 +6043,60 @@ function bindEvents() {
   });
 
   // Menü 4
+  document.querySelectorAll('.m4-ws-tab').forEach((btn) => btn.addEventListener('click', () => {
+    window._m4ActiveTab = btn.dataset.m4Tab || 'assign';
+    renderMenu4();
+  }));
+  document.getElementById('m4KpiUnassignedCard')?.addEventListener('click', () => {
+    window._m4ActiveTab = 'assign';
+    state.m4ClassFilter = 'ALL';
+    state.m4Search = '';
+    state.m4OnlyUnassigned = true;
+    saveState(); renderMenu4();
+  });
+  document.getElementById('m4KpiLoadsCard')?.addEventListener('click', () => {
+    window._m4ActiveTab = 'loads';
+    renderMenu4();
+  });
+  document.getElementById('m4KpiRoomsCard')?.addEventListener('click', () => {
+    window._m4ActiveTab = 'rooms';
+    renderMenu4();
+  });
+  document.getElementById('btnM4ResetFilters')?.addEventListener('click', () => {
+    state.m4ClassFilter = 'ALL'; state.m4OnlyUnassigned = false; state.m4Search = '';
+    saveState(); renderMenu4();
+  });
+  document.getElementById('btnM4GlobalAddCourse')?.addEventListener('click', () => openM4TeacherAddCourseModal(''));
+  document.getElementById('btnM4SuggestElectives')?.addEventListener('click', openM4ElectiveSuggestModal);
+
+  const m4AddModal = document.getElementById('m4TeacherAddCourseModal');
+  if (m4AddModal) {
+    document.getElementById('btnCloseM4AddCourse')?.addEventListener('click', closeM4TeacherAddCourseModal);
+    document.getElementById('btnCancelM4AddCourse')?.addEventListener('click', closeM4TeacherAddCourseModal);
+    m4AddModal.addEventListener('click', (e) => { if (e.target === m4AddModal) closeM4TeacherAddCourseModal(); });
+    document.querySelectorAll('.m4-add-mode-btn').forEach((b) => b.addEventListener('click', () => setM4AddCourseMode(b.dataset.m4AddMode)));
+    document.getElementById('m4AddNewClassSel')?.addEventListener('change', populateM4AddNewTemplates);
+    document.getElementById('m4AddNewTemplateSel')?.addEventListener('change', (e) => {
+      const opt = e.target.selectedOptions && e.target.selectedOptions[0];
+      if (!opt || !opt.dataset || !opt.dataset.name) return;
+      document.getElementById('m4AddNewName').value = opt.dataset.name;
+      document.getElementById('m4AddNewCode').value = opt.dataset.code || '';
+      document.getElementById('m4AddNewCategory').value = opt.dataset.cat || 'secmeli';
+      document.getElementById('m4AddNewHours').value = opt.dataset.hrs || '2';
+    });
+    document.getElementById('btnSubmitM4AddCourse')?.addEventListener('click', submitM4TeacherAddCourse);
+  }
+  const m4SugModal = document.getElementById('m4ElectiveSuggestModal');
+  if (m4SugModal) {
+    document.getElementById('btnCloseM4Suggest')?.addEventListener('click', closeM4ElectiveSuggestModal);
+    document.getElementById('btnCancelM4Suggest')?.addEventListener('click', closeM4ElectiveSuggestModal);
+    m4SugModal.addEventListener('click', (e) => { if (e.target === m4SugModal) closeM4ElectiveSuggestModal(); });
+    document.getElementById('btnConfirmM4Suggest')?.addEventListener('click', confirmM4ElectiveSuggestions);
+  }
+
   document.getElementById('m4ClassFilter').addEventListener('change', (e) => { state.m4ClassFilter = e.target.value; saveState(); renderMenu4(); });
-  document.getElementById('m4OnlyUnassigned').addEventListener('change', (e) => { state.m4OnlyUnassigned = e.target.checked; renderMenu4(); });
-  document.getElementById('m4Search').addEventListener('input', (e) => { state.m4Search = e.target.value; renderMenu4(); });
+  document.getElementById('m4OnlyUnassigned').addEventListener('change', (e) => { state.m4OnlyUnassigned = e.target.checked; saveState(); renderMenu4(); });
+  document.getElementById('m4Search').addEventListener('input', (e) => { state.m4Search = e.target.value; saveState(); renderMenu4(); });
   const m4LoadSearchEl = document.getElementById('m4LoadSearch');
   if (m4LoadSearchEl) {
     m4LoadSearchEl.addEventListener('input', (e) => { m4LoadSearchText = e.target.value; renderMenu4(); });
