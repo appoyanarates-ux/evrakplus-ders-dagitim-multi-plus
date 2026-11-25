@@ -1,8 +1,8 @@
 {
   "id": "/ders-dagitim-multi-plus/",
-  "name": "EvrakPlus Ders Dağıtım Multi Plus",
-  "short_name": "Multi Plus",
-  "description": "MEB 2026-2027 Altı Motorlu Haftalık Ders Dağıtım, Nöbet ve Programlama Uygulaması",
+  "name": "DersOptime Haftalık Ders Dağıtım Programı",
+  "short_name": "DersOptime",
+  "description": "MEB 2026-2027 Altı Motorlu Haftalık Ders Dağıtım, Nöbet ve Okul Kulübü Programı",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

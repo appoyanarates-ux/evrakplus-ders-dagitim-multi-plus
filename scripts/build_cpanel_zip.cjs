@@ -6,7 +6,7 @@ const { execFileSync } = require('child_process');
 const root = path.resolve(__dirname, '..');
 const stage = 'D:\\_build_cache\\cpanel_stage';
 const pkg = require(path.join(root, 'package.json'));
-const outZip = path.join(root, 'release', `EvrakPlus-Ders-Dagitim-Multi-Plus-${pkg.version}-cPanel.zip`);
+const outZip = path.join(root, 'release', `DersOptime-Haftalik-Ders-Dagitim-Programi-${pkg.version}-cPanel.zip`);
 
 fs.rmSync(stage, { recursive: true, force: true });
 fs.mkdirSync(stage, { recursive: true });

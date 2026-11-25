@@ -1,5 +1,5 @@
-appId: com.evrakplus.dersdagitim.multiplus
-productName: EvrakPlus Ders Dagitim Multi Plus
+appId: com.evrakplus.dersoptime
+productName: DersOptime
 copyright: Copyright © 2026 EvrakPlus
 directories:
   output: release
@@ -46,14 +46,14 @@ nsis:
   deleteAppDataOnUninstall: false
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: EvrakPlus Ders Dagitim Multi Plus
+  shortcutName: DersOptime Haftalik Ders Dagitim Programi
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
   installerHeaderIcon: build/icon.ico
-  artifactName: EvrakPlus-Ders-Dagitim-Multi-Plus-${version}-Setup.${ext}
+  artifactName: DersOptime-Haftalik-Ders-Dagitim-Programi-${version}-Setup.${ext}
   include: build/installer.nsh
 portable:
-  artifactName: EvrakPlus-Ders-Dagitim-Multi-Plus-${version}-Portable.${ext}
+  artifactName: DersOptime-Haftalik-Ders-Dagitim-Programi-${version}-Portable.${ext}
 publish:
   - provider: github
     owner: appoyanarates-ux

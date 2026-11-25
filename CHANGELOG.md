@@ -1,5 +1,9 @@
 # Sürüm Geçmişi (CHANGELOG)
 
+## [1.0.4] — 2026-11-25
+### Marka Güncellemesi
+- **Yeni Ürün Adı:** Program adı **DersOptime Haftalık Ders Dağıtım Programı** olarak güncellendi (pencere başlığı, kenar çubuğu, mobil PWA, kurulum sihirbazı, masaüstü kısayolu, Setup/Portable EXE ve cPanel/Web paketleri). Mevcut EvrakPlus üyelik sistemi ve kayıtlı okul projeleriyle %100 geriye uyumludur.
+
 ## [1.0.3] — 2026-11-24
 ### Canlı Dağıtım İzleme (Live Watch)
 - **Gerçek Zamanlı Dağıtım Yüzdesi ve İlerleme Paneli:** OR-Tools CP-SAT `CpSolverSolutionCallback` ve Multi Solver motorlarından gelen gerçek ara çözümlerle yerleşen blok sayısı, gerçek dağıtım yüzdesi (`%0`–`%100`), bulunan çözüm sayısı ve geçen süre canlı olarak gösterilir.

@@ -5,7 +5,7 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const rendererDir = path.join(root, 'renderer');
 const pkg = require(path.join(root, 'package.json'));
-const outHtml = path.join(root, 'release', `EvrakPlus-Ders-Dagitim-Multi-Plus-${pkg.version}-HTML-Preview.html`);
+const outHtml = path.join(root, 'release', `DersOptime-Haftalik-Ders-Dagitim-Programi-${pkg.version}-HTML-Preview.html`);
 fs.mkdirSync(path.dirname(outHtml), { recursive: true });
 
 let html = fs.readFileSync(path.join(rendererDir, 'index.html'), 'utf8');

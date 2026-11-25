@@ -487,7 +487,7 @@ function createMainWindow() {
     height: 860,
     minWidth: 960,
     minHeight: 640,
-    title: `EvrakPlus Ders Dağıtım Multi Plus v${app.getVersion()} — MEB 2026-2027`,
+    title: `DersOptime Haftalık Ders Dağıtım Programı v${app.getVersion()} — MEB 2026-2027`,
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     backgroundColor: '#f8fafc',
     autoHideMenuBar: true,
@@ -901,7 +901,7 @@ ipcMain.handle('system:get-about', async (event) => {
   const engineInfo = await getEngineInfo();
   const prefs = getBackupService().getPrefs();
   return {
-    productName: 'EvrakPlus Ders Dağıtım',
+    productName: 'DersOptime Haftalık Ders Dağıtım Programı',
     appVersion: app.getVersion(),
     schemaVersion: CURRENT_SCHEMA_VERSION,
     engineInfo,
