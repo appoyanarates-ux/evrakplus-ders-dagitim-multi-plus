@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import vm from 'node:vm';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 
@@ -76,4 +77,30 @@ test('Okul Kulüpleri modülü 32 MEB kulübü, manuel ekleme ve silmeyi destekl
   assert.equal(delRes.ok, true);
   assert.equal(st.schoolClubs.length, 32);
   assert.equal(st.teachersBySchool.s1[0].club, '');
+});
+
+test('Resmî MEB/TTKB 19 okul türü, 5 kurum grubu ve tüm zorunlu/seçmeli saat toplamları matematiksel olarak doğrudur', () => {
+  const ctx = { window: {}, defaultBlocksForHours: (h) => [h], inferRoomType: () => 'standard' };
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'renderer', 'meb_curriculum.js'), 'utf8'), ctx);
+  const { MEB_SCHOOL_GROUPS, MEB_SCHOOL_TYPES, MEB_BRANCHES_BY_SCHOOL_TYPE, getMebTemplatesForGrade } = ctx.window;
+  assert.equal(MEB_SCHOOL_GROUPS.length, 5);
+  assert.equal(Object.keys(MEB_SCHOOL_TYPES).length, 19);
+  for (const [id, meta] of Object.entries(MEB_SCHOOL_TYPES)) {
+    assert.ok(MEB_BRANCHES_BY_SCHOOL_TYPE[id]?.length > 0, `Branş listesi eksik: ${id}`);
+    const grades = meta.prepGrade ? [meta.prepGrade, ...meta.grades] : meta.grades;
+    for (const gr of grades) {
+      const mand = getMebTemplatesForGrade(id, gr.key, 'mandatory');
+      const elec = getMebTemplatesForGrade(id, gr.key, 'elective');
+      const mandSum = mand.reduce((s, c) => s + c.hours, 0);
+      const isPrimary = (id === 'ilkokul' || id === 'muzik_ilkokul');
+      const isOzel = id.startsWith('ozel_');
+      const expected = isPrimary
+        ? (gr.core + (gr.meslek || 0) + gr.elective)
+        : isOzel ? (gr.core + (gr.guidance || 0)) : (gr.core + (gr.meslek || 0) + (gr.guidance || 0));
+      assert.equal(mandSum, expected, `${id} ${gr.key}. sınıf zorunlu saat toplamı uyumsuz`);
+      if (!isPrimary && (gr.elective > 0 || (isOzel && gr.meslek > 0))) {
+        assert.ok(elec.length > 0, `${id} ${gr.key}. sınıf seçmeli havuzu boş`);
+      }
+    }
+  }
 });

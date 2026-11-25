@@ -1,5 +1,15 @@
 # Sürüm Geçmişi (CHANGELOG)
 
+## [1.0.7] — 2026-11-25
+### Resmî MEB / TTKB 2025–2026 ve 2026–2027 Haftalık Ders Çizelgeleri & Okul Türü Gruplandırması
+- **5 Resmî Kurum Grubunda 19 Okul Türü (`renderer/meb_curriculum.js`):**
+  1. **Temel Eğitim (TTKB 23/09/2026 — 113, 114, 115):** İlkokul, Ortaokul, Güzel Sanatlar Müzik İlkokulu, Güzel Sanatlar Müzik Ortaokulu, Spor Ortaokulu.
+  2. **Din Öğretimi (TTKB 23/09/2026 — 117 & 23/07/2025 — 26):** İmam Hatip Ortaokulu (28 standart + 12 Müzik/Spor Programı seçmeli), Anadolu İmam Hatip Lisesi (Ortak + Meslek + A ve B Grubu seçmeliler).
+  3. **Genel Ortaöğretim (TTKB 09/05/2025 — 05):** Anadolu Lisesi, Fen Lisesi, Sosyal Bilimler Lisesi (Hazırlık sınıfı saatleri düzeltildi, eksik 25+ seçmeli ders tamamlandı).
+  4. **Güzel Sanatlar ve Spor Liseleri (TTKB 09/05/2025 — 06, 07 & 02/09/2026 — 102, 103):** GSL Görsel Sanatlar, GSL Tiyatro, GSL Müzik, GSL Türk Müziği (43 saat), Spor Lisesi, Tematik Program Uygulayan Spor Lisesi (40 saat).
+  5. **Özel Program Uygulayan Proje Liseleri (TTKB 23/07/2025 — 24, 25 & 02/09/2026 — 104):** Özel Program Uygulayan Hazırlıklı Anadolu Lisesi, Fen Lisesi ve Sosyal Bilimler Lisesi (45 saat, tüm tematik alan ve çok yönlü gelişim dersleri).
+- **Matematiksel Saat Doğrulaması:** Tüm 19 okul türünün her sınıf seviyesindeki Ortak + Alan/Meslek + Rehberlik + Serbest Etkinlik ders toplamlarının resmî TTKB çizelge toplamlarıyla birebir örtüştüğü otomatik testle doğrulandı.
+
 ## [1.0.6] — 2026-11-25
 ### Profesyonel Öğretmen Ders Yükleri & Mükerrer Ders Koruması
 - **Menü 4 — Gelişmiş Öğretmen Ders Yükleri Paneli:** Her öğretmenin isminin altında atanan tüm dersler, şubeler, saatler ve **ders blokları (`Blok: 2+2+1`)** varsayılan olarak açık listelenir.

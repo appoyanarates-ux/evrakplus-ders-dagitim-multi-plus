@@ -1,9 +1,10 @@
 'use strict';
 
-const CACHE_NAME = 'dersoptima-pro-pwa-v1.0.6';
+const CACHE_NAME = 'dersoptima-pro-pwa-v1.0.7';
 const STATIC_ASSETS = [
   './',
   './index.html',
+  './meb_curriculum.js',
   './app.js',
   './clubs_module.js',
   './multi_solver_ui.js',

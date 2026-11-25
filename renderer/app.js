@@ -1,120 +1,8 @@
 'use strict';
 
 /* =========================================================================
-   1. MEB 2026-2027 OKUL TÜRLERİ (REFERANS ŞABLON — RESMÎ ÇİZELGEYLE DOĞRULANMALIDIR)
+   1. MEB 2025-2026 / 2026-2027 OKUL TÜRLERİ (meb_curriculum.js'den yüklenir)
    ========================================================================= */
-const MEB_SCHOOL_TYPES = {
-  ilkokul: {
-    id: 'ilkokul', name: 'İlkokul (1-4. Sınıf)', shortName: 'İlkokul',
-    decision: 'Referans Şablon (İlkokul)', defaultPeriods: 6, defaultTargetHours: 30,
-    hasPrepOption: false, hasIhoModes: false, hasMeslekCol: false,
-    grades: [
-      { key: '1', grade: '1. Sınıf', core: 26, elective: 4, guidance: 0, total: 30 },
-      { key: '2', grade: '2. Sınıf', core: 28, elective: 2, guidance: 0, total: 30 },
-      { key: '3', grade: '3. Sınıf', core: 28, elective: 2, guidance: 0, total: 30 },
-      { key: '4', grade: '4. Sınıf', core: 30, elective: 0, guidance: 0, total: 30 }
-    ],
-    notes: [
-      'Seçmeli sütunu 1–3. sınıflardaki Serbest Etkinlikler saatini gösterir.',
-      'Ders saatlerini okul türünüzün güncel resmî MEB/TTKB haftalık ders çizelgesiyle doğrulayınız.'
-    ]
-  },
-  ortaokul: {
-    id: 'ortaokul', name: 'Ortaokul (5-8. Sınıf)', shortName: 'Ortaokul',
-    decision: 'Referans Şablon (Ortaokul)', defaultPeriods: 7, defaultTargetHours: 35,
-    hasPrepOption: false, hasIhoModes: false, hasMeslekCol: false,
-    grades: [
-      { key: '5', grade: '5. Sınıf', core: 30, elective: 5, guidance: 0, total: 35 },
-      { key: '6', grade: '6. Sınıf', core: 30, elective: 5, guidance: 0, total: 35 },
-      { key: '7', grade: '7. Sınıf', core: 30, elective: 5, guidance: 0, total: 35 },
-      { key: '8', grade: '8. Sınıf', core: 29, elective: 6, guidance: 0, total: 35 }
-    ],
-    notes: [
-      'Haftalık toplam ders saati 35 saat olarak tanımlanmıştır (5–7. sınıf: 30 zorunlu + 5 seçmeli; 8. sınıf: 29 zorunlu + 6 seçmeli).',
-      'Ders saatlerini kurumunuzun güncel resmî MEB/TTKB haftalık ders çizelgesiyle doğrulayınız.'
-    ]
-  },
-  iho: {
-    id: 'iho', name: 'İmam Hatip Ortaokulu', shortName: 'İmam Hatip Ortaokulu',
-    decision: 'Referans Şablon (İHO)', defaultPeriods: 8, defaultTargetHours: 36,
-    hasPrepOption: false, hasIhoModes: true, hasMeslekCol: false,
-    grades: [
-      { key: '5', grade: '5. Sınıf', core: 35, elective: 1, guidance: 0, total: 36 },
-      { key: '6', grade: '6. Sınıf', core: 35, elective: 1, guidance: 0, total: 36 },
-      { key: '7', grade: '7. Sınıf', core: 35, elective: 1, guidance: 0, total: 36 },
-      { key: '8', grade: '8. Sınıf', core: 34, elective: 2, guidance: 0, total: 36 }
-    ],
-    notes: [
-      'Standart şablon 36 saattir (40 saat / Hafızlık 27 saat seçenekleri mevcuttur).',
-      'Ders saatlerini güncel resmî MEB/TTKB çizelgesiyle doğrulayınız.'
-    ]
-  },
-  anadolu: {
-    id: 'anadolu', name: 'Anadolu Lisesi', shortName: 'Anadolu Lisesi',
-    decision: 'Referans Şablon (Anadolu L.)', defaultPeriods: 8, defaultTargetHours: 40,
-    hasPrepOption: true, hasIhoModes: false, hasMeslekCol: false,
-    prepGrade: { key: 'H', grade: 'Hazırlık', core: 39, elective: 0, guidance: 1, total: 40 },
-    grades: [
-      { key: '9', grade: '9. Sınıf', core: 32, elective: 7, guidance: 1, total: 40 },
-      { key: '10', grade: '10. Sınıf', core: 33, elective: 6, guidance: 1, total: 40 },
-      { key: '11', grade: '11. Sınıf', core: 19, elective: 20, guidance: 1, total: 40 },
-      { key: '12', grade: '12. Sınıf', core: 15, elective: 24, guidance: 1, total: 40 }
-    ],
-    notes: [
-      '9–10. sınıflarda 3 seçmeli gruptan, 11–12. sınıflarda en az 2 gruptan ders seçilir.',
-      'Ders saatlerini güncel resmî MEB/TTKB çizelgesiyle doğrulayınız.'
-    ]
-  },
-  fen: {
-    id: 'fen', name: 'Fen Lisesi', shortName: 'Fen Lisesi',
-    decision: 'Referans Şablon (Fen L.)', defaultPeriods: 8, defaultTargetHours: 40,
-    hasPrepOption: true, hasIhoModes: false, hasMeslekCol: false,
-    prepGrade: { key: 'H', grade: 'Hazırlık', core: 39, elective: 0, guidance: 1, total: 40 },
-    grades: [
-      { key: '9', grade: '9. Sınıf', core: 34, elective: 5, guidance: 1, total: 40 },
-      { key: '10', grade: '10. Sınıf', core: 35, elective: 4, guidance: 1, total: 40 },
-      { key: '11', grade: '11. Sınıf', core: 35, elective: 4, guidance: 1, total: 40 },
-      { key: '12', grade: '12. Sınıf', core: 31, elective: 8, guidance: 1, total: 40 }
-    ],
-    notes: [
-      'Matematik tüm sınıflarda 6 saat; Fizik, Kimya, Biyoloji 11–12. sınıflarda 4’er saat şablon olarak verilmiştir.',
-      'Ders saatlerini güncel resmî MEB/TTKB çizelgesiyle doğrulayınız.'
-    ]
-  },
-  sosyal: {
-    id: 'sosyal', name: 'Sosyal Bilimler Lisesi', shortName: 'Sosyal Bilimler L.',
-    decision: 'Referans Şablon (SBL)', defaultPeriods: 8, defaultTargetHours: 40,
-    hasPrepOption: true, hasIhoModes: false, hasMeslekCol: false,
-    prepGrade: { key: 'H', grade: 'Hazırlık', core: 39, elective: 0, guidance: 1, total: 40 },
-    grades: [
-      { key: '9', grade: '9. Sınıf', core: 32, elective: 7, guidance: 1, total: 40 },
-      { key: '10', grade: '10. Sınıf', core: 35, elective: 4, guidance: 1, total: 40 },
-      { key: '11', grade: '11. Sınıf', core: 37, elective: 3, guidance: 0, total: 40 },
-      { key: '12', grade: '12. Sınıf', core: 31, elective: 8, guidance: 1, total: 40 }
-    ],
-    notes: [
-      '11. sınıfta Rehberlik şablonda yer almaz (37 ortak + 3 seçmeli = 40 saat).',
-      'Ders saatlerini güncel resmî MEB/TTKB çizelgesiyle doğrulayınız.'
-    ]
-  },
-  aihl: {
-    id: 'aihl', name: 'Anadolu İmam Hatip Lisesi', shortName: 'Anadolu İHL',
-    decision: 'Referans Şablon (AİHL)', defaultPeriods: 8, defaultTargetHours: 40,
-    hasPrepOption: true, hasIhoModes: false, hasMeslekCol: true,
-    prepGrade: { key: 'H', grade: 'Hazırlık', core: 35, meslek: 4, elective: 0, guidance: 1, total: 40 },
-    grades: [
-      { key: '9', grade: '9. Sınıf', core: 33, meslek: 6, elective: 0, guidance: 1, total: 40 },
-      { key: '10', grade: '10. Sınıf', core: 29, meslek: 11, elective: 0, guidance: 0, total: 40 },
-      { key: '11', grade: '11. Sınıf', core: 12, meslek: 12, elective: 16, guidance: 0, total: 40 },
-      { key: '12', grade: '12. Sınıf', core: 9, meslek: 10, elective: 21, guidance: 0, total: 40 }
-    ],
-    notes: [
-      'Ortak + Meslek + A/B Grubu seçmeli dersler toplamı 40 saattir.',
-      'Ders saatlerini güncel resmî MEB/TTKB çizelgesiyle doğrulayınız.'
-    ]
-  }
-};
-
 const ROOM_TYPES = [
   { id: 'standard', label: 'Standart Derslik' },
   { id: 'bilisim_lab', label: 'Bilişim / BT Lab' },
@@ -128,47 +16,6 @@ const ROOM_TYPES = [
 
 const DAY_NAMES = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 const DAY_SHORT = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
-
-const MEB_BRANCHES_BY_SCHOOL_TYPE = {
-  ilkokul: [
-    'Sınıf Öğretmenliği', 'İngilizce', 'Din Kültürü ve Ahlak Bilgisi',
-    'Rehberlik (PDR)', 'Görsel Sanatlar', 'Müzik', 'Beden Eğitimi', 'Özel Eğitim'
-  ],
-  ortaokul: [
-    'Türkçe', 'İlköğretim Matematik', 'Fen Bilimleri', 'Sosyal Bilgiler', 'İngilizce',
-    'Din Kültürü ve Ahlak Bilgisi', 'Bilişim Teknolojileri', 'Teknoloji ve Tasarım',
-    'Görsel Sanatlar', 'Müzik', 'Beden Eğitimi', 'Rehberlik (PDR)', 'Almanca / 2. Yabancı Dil'
-  ],
-  iho: [
-    'Türkçe', 'İlköğretim Matematik', 'Fen Bilimleri', 'Sosyal Bilgiler', 'İngilizce',
-    'İHL Meslek Dersleri', 'Arapça', 'Din Kültürü ve Ahlak Bilgisi', 'Bilişim Teknolojileri',
-    'Teknoloji ve Tasarım', 'Görsel Sanatlar', 'Müzik', 'Beden Eğitimi', 'Rehberlik (PDR)'
-  ],
-  anadolu: [
-    'Türk Dili ve Edebiyatı', 'Matematik', 'Fizik', 'Kimya', 'Biyoloji',
-    'Tarih', 'Coğrafya', 'Felsefe Grubu', 'İngilizce', 'Almanca / 2. Yabancı Dil',
-    'Din Kültürü ve Ahlak Bilgisi', 'Bilişim Teknolojileri', 'Beden Eğitimi',
-    'Görsel Sanatlar', 'Müzik', 'Rehberlik (PDR)', 'Sağlık Bilgisi'
-  ],
-  fen: [
-    'Türk Dili ve Edebiyatı', 'Matematik', 'Fizik', 'Kimya', 'Biyoloji',
-    'Tarih', 'Coğrafya', 'Felsefe Grubu', 'İngilizce', 'Almanca / 2. Yabancı Dil',
-    'Din Kültürü ve Ahlak Bilgisi', 'Bilişim Teknolojileri', 'Beden Eğitimi',
-    'Görsel Sanatlar', 'Müzik', 'Rehberlik (PDR)'
-  ],
-  sosyal: [
-    'Türk Dili ve Edebiyatı', 'Matematik', 'Tarih', 'Coğrafya', 'Felsefe Grubu',
-    'Fizik', 'Kimya', 'Biyoloji', 'İngilizce', 'Almanca / 2. Yabancı Dil',
-    'Din Kültürü ve Ahlak Bilgisi', 'Bilişim Teknolojileri', 'Beden Eğitimi',
-    'Görsel Sanatlar', 'Müzik', 'Rehberlik (PDR)'
-  ],
-  aihl: [
-    'Türk Dili ve Edebiyatı', 'Matematik', 'İHL Meslek Dersleri', 'Arapça',
-    'Fizik', 'Kimya', 'Biyoloji', 'Tarih', 'Coğrafya', 'Felsefe Grubu',
-    'İngilizce', 'Din Kültürü ve Ahlak Bilgisi', 'Bilişim Teknolojileri',
-    'Beden Eğitimi', 'Görsel Sanatlar', 'Müzik', 'Rehberlik (PDR)'
-  ]
-};
 
 /* =========================================================================
    2. BLOK VE DERS ŞABLONLARI
@@ -215,231 +62,7 @@ function inferRoomType(name) {
   return 'standard';
 }
 
-function getMebTemplatesForGrade(schoolTypeId, gradeKey, onlyType) {
-  const list = [];
-  const add = (code, name, cat, grp, spec, opts = {}) => {
-    const isMand = (cat === 'zorunlu' || cat === 'meslek' || cat === 'serbest');
-    if (onlyType === 'mandatory' && !isMand) return;
-    if (onlyType === 'elective' && isMand) return;
-    const val = spec[gradeKey];
-    if (!val) return;
-    const hourOpts = Array.isArray(val) ? val : [val];
-    const hrs = hourOpts[hourOpts.length - 1];
-    list.push({
-      code, name, category: cat, group: grp, hours: hrs, hourOptions: hourOpts,
-      blocks: defaultBlocksForHours(hrs), blockMode: 'auto',
-      maxPerDay: opts.maxPerDay || 1,
-      roomType: opts.roomType || inferRoomType(name),
-      splitGroups: Boolean(opts.canSplit),
-      useCommonSlot: false
-    });
-  };
-
-  if (schoolTypeId === 'ilkokul') {
-    add('TRK', 'Türkçe', 'zorunlu', 'Zorunlu', { '1': 10, '2': 10, '3': 8, '4': 8 }, { maxPerDay: 2 });
-    add('MAT', 'Matematik', 'zorunlu', 'Zorunlu', { '1': 5, '2': 5, '3': 5, '4': 5 });
-    add('HYB', 'Hayat Bilgisi', 'zorunlu', 'Zorunlu', { '1': 4, '2': 4, '3': 3 });
-    add('FEN', 'Fen Bilimleri', 'zorunlu', 'Zorunlu', { '3': 3, '4': 3 });
-    add('SOS', 'Sosyal Bilgiler', 'zorunlu', 'Zorunlu', { '4': 3 });
-    add('ING', 'Yabancı Dil', 'zorunlu', 'Zorunlu', { '2': 2, '3': 2, '4': 2 });
-    add('DKB', 'Din Kültürü ve Ahlak Bilgisi', 'zorunlu', 'Zorunlu', { '4': 2 });
-    add('GRS', 'Görsel Sanatlar', 'zorunlu', 'Zorunlu', { '1': 1, '2': 1, '3': 1, '4': 1 });
-    add('MZK', 'Müzik', 'zorunlu', 'Zorunlu', { '1': 1, '2': 1, '3': 1, '4': 1 });
-    add('BEO', 'Beden Eğitimi ve Oyun', 'zorunlu', 'Zorunlu', { '1': 5, '2': 5, '3': 5, '4': 2 });
-    add('TRF', 'Trafik Güvenliği', 'zorunlu', 'Zorunlu', { '4': 1 });
-    add('IHD', 'İnsan Hakları, Vatandaşlık ve Demokrasi', 'zorunlu', 'Zorunlu', { '4': 2 });
-    add('SRB', 'Serbest Etkinlikler', 'serbest', 'Serbest Etkinlik', { '1': 4, '2': 2, '3': 2 });
-  } else if (schoolTypeId === 'ortaokul') {
-    add('TRK', 'Türkçe', 'zorunlu', 'Zorunlu', { '5': 6, '6': 6, '7': 5, '8': 5 });
-    add('MAT', 'Matematik', 'zorunlu', 'Zorunlu', { '5': 5, '6': 5, '7': 5, '8': 5 });
-    add('FEN', 'Fen Bilimleri', 'zorunlu', 'Zorunlu', { '5': 4, '6': 4, '7': 4, '8': 4 });
-    add('SOS', 'Sosyal Bilgiler', 'zorunlu', 'Zorunlu', { '5': 3, '6': 3, '7': 3 });
-    add('INK', 'T.C. İnkılap Tarihi ve Atatürkçülük', 'zorunlu', 'Zorunlu', { '8': 2 });
-    add('ING', 'Yabancı Dil', 'zorunlu', 'Zorunlu', { '5': 3, '6': 3, '7': 4, '8': 4 });
-    add('DKB', 'Din Kültürü ve Ahlak Bilgisi', 'zorunlu', 'Zorunlu', { '5': 2, '6': 2, '7': 2, '8': 2 });
-    add('GRS', 'Görsel Sanatlar', 'zorunlu', 'Zorunlu', { '5': 1, '6': 1, '7': 1, '8': 1 });
-    add('MZK', 'Müzik', 'zorunlu', 'Zorunlu', { '5': 1, '6': 1, '7': 1, '8': 1 });
-    add('BES', 'Beden Eğitimi ve Spor', 'zorunlu', 'Zorunlu', { '5': 2, '6': 2, '7': 2, '8': 2 });
-    add('TKT', 'Teknoloji ve Tasarım', 'zorunlu', 'Zorunlu', { '7': 2, '8': 2 });
-    add('BTY', 'Bilişim Teknolojileri ve Yazılım', 'zorunlu', 'Zorunlu', { '5': 2, '6': 2 });
-    add('REH', 'Rehberlik ve Yönlendirme', 'zorunlu', 'Zorunlu', { '5': 1, '6': 1, '7': 1, '8': 1 });
-    const g1 = 'İnsan, Toplum ve Bilim';
-    add('MBU', 'Matematik ve Bilim Uygulamaları', 'secmeli', g1, { '6': 2, '7': 2 });
-    add('OKB', 'Okuma Becerileri', 'secmeli', g1, { '5': 2, '6': 2 });
-    add('YZB', 'Yazarlık ve Yazma Becerileri', 'secmeli', g1, { '5': [1, 2], '6': [1, 2], '7': [1, 2], '8': 2 });
-    add('YDL', 'Yaşayan Diller ve Lehçeler', 'secmeli', g1, { '5': 2, '6': 2, '7': 2, '8': 2 });
-    add('SYD', 'Seçmeli Yabancı Dil', 'secmeli', g1, { '5': 2, '6': 2, '7': 2, '8': 2 });
-    add('CEV', 'Çevre Eğitimi ve İklim Değişikliği', 'secmeli', g1, { '6': 2, '7': 2, '8': 2 });
-    add('SHR', '“Şehrimiz…”', 'secmeli', g1, { '5': [1, 2], '6': [1, 2], '7': [1, 2], '8': 2 });
-    add('HUK', 'Hukuk ve Adalet', 'secmeli', g1, { '6': 2, '7': 2, '8': 2 });
-    add('DSN', 'Düşünme Eğitimi', 'secmeli', g1, { '7': [1, 2], '8': 2 });
-    add('ROB', 'Robotik Kodlama', 'secmeli', g1, { '5': 2, '6': 2 });
-    add('YZU', 'Yapay Zekâ Uygulamaları', 'secmeli', g1, { '7': 2, '8': 2 });
-    add('PRJ', 'Proje Tasarımı ve Uygulamaları', 'secmeli', g1, { '5': [1, 2], '6': [1, 2], '7': [1, 2] });
-    add('OSS', 'Okul Temelli Sosyal Sorumluluk', 'secmeli', g1, { '6': 2, '7': 2, '8': 2 });
-    add('MED', 'Medya Okuryazarlığı', 'secmeli', g1, { '7': 2, '8': 2 });
-    add('AFT', 'Afet Bilinci', 'secmeli', g1, { '5': [1, 2], '6': [1, 2], '7': [1, 2] });
-    add('TYB', 'Temel Yaşam Becerileri', 'secmeli', g1, { '5': [1, 2], '6': [1, 2], '7': [1, 2], '8': 2 });
-    add('TSA', 'Türk Sosyal Hayatında Aile', 'secmeli', g1, { '5': 2, '6': 2, '7': 2, '8': 2 });
-    const g2 = 'Din, Ahlak ve Değer';
-    add('KUR', "Kur'an-ı Kerim", 'secmeli', g2, { '5': 2, '6': 2, '7': 2, '8': 2 });
-    add('PEY', 'Peygamberimizin Hayatı', 'secmeli', g2, { '5': 2, '6': 2, '7': 2, '8': 2 });
-    add('TDB', 'Temel Dinî Bilgiler', 'secmeli', g2, { '5': [1, 2], '6': [1, 2], '7': [1, 2], '8': 2 });
-    add('KMV', 'Kültür ve Medeniyetimize Yön Verenler', 'secmeli', g2, { '5': 2, '6': 2, '7': 2, '8': 2 });
-    add('AVE', 'Ahlak ve Vatandaşlık Eğitimi', 'secmeli', g2, { '5': [1, 2], '6': [1, 2], '7': [1, 2], '8': 2 });
-    const g3 = 'Kültür, Sanat ve Spor';
-    add('GRG', 'Görgü Kuralları ve Nezaket', 'secmeli', g3, { '5': 2, '6': 2, '7': 2, '8': 2 });
-    add('SMZ', 'Seçmeli Müzik', 'secmeli', g3, { '5': [1, 2], '6': [1, 2], '7': [1, 2], '8': 2 });
-    add('SFE', 'Spor ve Fiziki Etkinlikler', 'secmeli', g3, { '5': 2, '6': 2, '7': 2, '8': 2 });
-    add('OYN', 'Oyun ve Oyun Etkinlikleri', 'secmeli', g3, { '5': [1, 2], '6': [1, 2], '7': [1, 2] });
-    add('DJS', 'Dijital Sanatlar', 'secmeli', g3, { '6': [1, 2], '7': [1, 2] });
-    add('MSL', 'Masal ve Destanlarımız', 'secmeli', g3, { '5': [1, 2], '6': [1, 2], '7': [1, 2], '8': 2 });
-    add('GLN', 'Geleneksel Sanatlar', 'secmeli', g3, { '6': [1, 2], '7': [1, 2] });
-    add('HLK', 'Halk Oyunları', 'secmeli', g3, { '5': 2, '6': 2, '7': 2, '8': 2 });
-  } else if (schoolTypeId === 'iho') {
-    add('TRK', 'Türkçe', 'zorunlu', 'Zorunlu', { '5': 6, '6': 6, '7': 5, '8': 5 });
-    add('MAT', 'Matematik', 'zorunlu', 'Zorunlu', { '5': 5, '6': 5, '7': 5, '8': 5 });
-    add('FEN', 'Fen Bilimleri', 'zorunlu', 'Zorunlu', { '5': 4, '6': 4, '7': 4, '8': 4 });
-    add('SOS', 'Sosyal Bilgiler', 'zorunlu', 'Zorunlu', { '5': 3, '6': 3, '7': 3 });
-    add('INK', 'T.C. İnkılap Tarihi ve Atatürkçülük', 'zorunlu', 'Zorunlu', { '8': 2 });
-    add('ING', 'Yabancı Dil', 'zorunlu', 'Zorunlu', { '5': 3, '6': 3, '7': 4, '8': 4 });
-    add('DKB', 'Din Kültürü ve Ahlak Bilgisi', 'zorunlu', 'Zorunlu', { '5': 2, '6': 2, '7': 2, '8': 2 });
-    add('GRS', 'Görsel Sanatlar', 'zorunlu', 'Zorunlu', { '5': 1, '6': 1, '7': 1, '8': 1 });
-    add('MZK', 'Müzik', 'zorunlu', 'Zorunlu', { '5': 1, '6': 1, '7': 1, '8': 1 });
-    add('BES', 'Beden Eğitimi ve Spor', 'zorunlu', 'Zorunlu', { '5': 2, '6': 1, '7': 1, '8': 1 });
-    add('TKT', 'Teknoloji ve Tasarım', 'zorunlu', 'Zorunlu', { '7': 1, '8': 2 });
-    add('BTY', 'Bilişim Teknolojileri ve Yazılım', 'zorunlu', 'Zorunlu', { '5': 1, '6': 1 });
-    add('REH', 'Rehberlik ve Yönlendirme', 'zorunlu', 'Zorunlu', { '5': 1, '6': 1, '7': 1, '8': 1 });
-    add('KUR', "Kur'an-ı Kerim", 'zorunlu', 'Zorunlu', { '5': 2, '6': 2, '7': 2, '8': 2 });
-    add('ARP', 'Arapça', 'zorunlu', 'Zorunlu', { '5': 2, '6': 2, '7': 2, '8': 2 });
-    add('PEY', 'Peygamberimizin Hayatı', 'zorunlu', 'Zorunlu', { '5': 2, '6': 2, '7': 2, '8': 2 });
-    add('TDB', 'Temel Dinî Bilgiler', 'zorunlu', 'Zorunlu', { '6': 1, '7': 1 });
-    add('OKB', 'Okuma Becerileri', 'secmeli', 'İnsan, Toplum ve Bilim', { '5': 1, '6': 1 });
-    add('ROB', 'Robotik Kodlama', 'secmeli', 'İnsan, Toplum ve Bilim', { '5': 1, '6': 1 });
-    add('YZU', 'Yapay Zekâ Uygulamaları', 'secmeli', 'İnsan, Toplum ve Bilim', { '7': 1, '8': [1, 2] });
-    add('SYD', 'Seçmeli Yabancı Dil', 'secmeli', 'İnsan, Toplum ve Bilim', { '5': 1, '6': 1, '7': 1, '8': [1, 2] });
-    add('SKUR', "Seçmeli Kur'an-ı Kerim", 'secmeli', 'Din, Ahlak ve Değer', { '5': 1, '6': 1, '7': 1, '8': [1, 2] });
-    add('AVE', 'Ahlak ve Vatandaşlık Eğitimi', 'secmeli', 'Din, Ahlak ve Değer', { '5': 1, '6': 1, '7': 1, '8': 1 });
-    add('GRG', 'Görgü Kuralları ve Nezaket', 'secmeli', 'Kültür, Sanat ve Spor', { '5': 1, '6': 1, '7': 1, '8': 1 });
-    add('SFE', 'Spor ve Fiziki Etkinlikler', 'secmeli', 'Kültür, Sanat ve Spor', { '5': 1, '6': 1, '7': 1, '8': 1 });
-  } else if (schoolTypeId === 'anadolu' || schoolTypeId === 'fen' || schoolTypeId === 'sosyal') {
-    add('HTDE', 'Hazırlık Türk Dili ve Edebiyatı', 'zorunlu', 'Ortak', { 'H': 4 });
-    add('HMAT', 'Hazırlık Matematik', 'zorunlu', 'Ortak', { 'H': 3 });
-    add('HYD1', 'Hazırlık Birinci Yabancı Dil', 'zorunlu', 'Ortak', { 'H': 20 }, { maxPerDay: 2 });
-    add('HYD2', 'Hazırlık İkinci Yabancı Dil', 'zorunlu', 'Ortak', { 'H': 4 });
-    add('HBTY', 'Hazırlık Bilişim Teknolojileri', 'zorunlu', 'Ortak', { 'H': 4 });
-    add('HBES', 'Hazırlık Beden Eğitimi ve Spor', 'zorunlu', 'Ortak', { 'H': 2 });
-    add('HGMZ', 'Hazırlık Görsel Sanatlar / Müzik', 'zorunlu', 'Ortak', { 'H': 2 });
-
-    add('TDE', 'Türk Dili ve Edebiyatı', 'zorunlu', 'Ortak', { '9': 5, '10': 5, '11': 5, '12': 5 });
-    add('DKB', 'Din Kültürü ve Ahlak Bilgisi', 'zorunlu', 'Ortak', { '9': 2, '10': 2, '11': 2, '12': 2 });
-    add('TAR', 'Tarih', 'zorunlu', 'Ortak', { '9': 2, '10': 2, '11': 2 });
-    add('INK', 'T.C. İnkılap Tarihi ve Atatürkçülük', 'zorunlu', 'Ortak', { '12': 2 });
-    if (schoolTypeId === 'anadolu') {
-      add('COG', 'Coğrafya', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-      add('MAT', 'Matematik', 'zorunlu', 'Ortak', { '9': 6, '10': 6 });
-      add('FIZ', 'Fizik', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-      add('KIM', 'Kimya', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-      add('BIY', 'Biyoloji', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-      add('FEL', 'Felsefe', 'zorunlu', 'Ortak', { '10': 2, '11': 2 });
-      add('YD1', 'Birinci Yabancı Dil', 'zorunlu', 'Ortak', { '9': 4, '10': 4, '11': 4, '12': 4 });
-      add('BES', 'Beden Eğitimi ve Spor', 'zorunlu', 'Ortak', { '9': 2, '10': 2, '11': 2 });
-      add('GMZ', 'Görsel Sanatlar / Müzik', 'zorunlu', 'Ortak', { '9': 2, '10': 2, '11': 2 });
-      add('BGS', 'Beden Eğitimi / Görsel / Müzik', 'zorunlu', 'Ortak', { '12': 2 });
-      add('SGT', 'Sağlık Bilgisi ve Trafik Kültürü', 'zorunlu', 'Ortak', { '9': 1 });
-      add('REH', 'Rehberlik ve Yönlendirme', 'zorunlu', 'Ortak', { 'H': 1, '9': 1, '10': 1, '11': 1, '12': 1 });
-    } else if (schoolTypeId === 'fen') {
-      add('COG', 'Coğrafya', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-      add('MAT', 'Matematik', 'zorunlu', 'Ortak', { '9': 6, '10': 6, '11': 6, '12': 6 });
-      add('FIZ', 'Fizik', 'zorunlu', 'Ortak', { '9': 2, '10': 2, '11': 4, '12': 4 });
-      add('KIM', 'Kimya', 'zorunlu', 'Ortak', { '9': 2, '10': 2, '11': 4, '12': 4 });
-      add('BIY', 'Biyoloji', 'zorunlu', 'Ortak', { '9': 2, '10': 2, '11': 4, '12': 4 });
-      add('FEL', 'Felsefe', 'zorunlu', 'Ortak', { '10': 2, '11': 2 });
-      add('YD1', 'Birinci Yabancı Dil', 'zorunlu', 'Ortak', { '9': 4, '10': 4, '11': 4, '12': 4 });
-      add('BTY', 'Bilişim Teknolojileri ve Yazılım', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-      add('BES', 'Beden Eğitimi ve Spor', 'zorunlu', 'Ortak', { '9': 2, '10': 2, '11': 2 });
-      add('GMZ', 'Görsel Sanatlar / Müzik', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-      add('SGT', 'Sağlık Bilgisi ve Trafik Kültürü', 'zorunlu', 'Ortak', { '9': 1 });
-      add('REH', 'Rehberlik ve Yönlendirme', 'zorunlu', 'Ortak', { 'H': 1, '9': 1, '10': 1, '11': 1, '12': 1 });
-    } else {
-      add('TKM', 'Türk Kültür ve Medeniyet Tarihi', 'zorunlu', 'Ortak', { '11': 2 });
-      add('CTD', 'Çağdaş Türk ve Dünya Tarihi', 'zorunlu', 'Ortak', { '12': 2 });
-      add('COG', 'Coğrafya', 'zorunlu', 'Ortak', { '9': 2, '10': 2, '11': 4, '12': 4 });
-      add('MAT', 'Matematik', 'zorunlu', 'Ortak', { '9': 6, '10': 6, '11': 6, '12': 6 });
-      add('FIZ', 'Fizik', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-      add('KIM', 'Kimya', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-      add('BIY', 'Biyoloji', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-      add('FEL', 'Felsefe', 'zorunlu', 'Ortak', { '10': 2, '11': 2 });
-      add('YD1', 'Birinci Yabancı Dil', 'zorunlu', 'Ortak', { '9': 4, '10': 4, '11': 2, '12': 2 });
-      add('BGS', 'Beden / Görsel / Müzik', 'zorunlu', 'Ortak', { '9': 2, '10': 2, '11': 2, '12': 2 });
-      add('SGT', 'Sağlık Bilgisi ve Trafik Kültürü', 'zorunlu', 'Ortak', { '9': 1 });
-      add('SBC', 'Sosyal Bilim Çalışmaları', 'zorunlu', 'Ortak', { '10': 2, '11': 2, '12': 2 });
-      add('PSK', 'Psikoloji', 'zorunlu', 'Ortak', { '11': 2 });
-      add('SYJ', 'Sosyoloji', 'zorunlu', 'Ortak', { '11': 2, '12': 2 });
-      add('SNT', 'Sanat Tarihi', 'zorunlu', 'Ortak', { '12': 2 });
-      add('MNT', 'Mantık', 'zorunlu', 'Ortak', { '11': 2 });
-      add('OSM', 'Osmanlı Türkçesi', 'zorunlu', 'Ortak', { '9': 2, '10': 2, '11': 2 });
-      add('REH', 'Rehberlik ve Yönlendirme', 'zorunlu', 'Ortak', { 'H': 1, '9': 1, '10': 1, '12': 1 });
-    }
-    add('SMAT', 'Seçmeli Matematik', 'secmeli', 'Akademik Çalışmalar', { '11': 6, '12': 6 });
-    add('SFIZ', 'Seçmeli Fizik', 'secmeli', 'Akademik Çalışmalar', { '11': 4, '12': 4 });
-    add('SKIM', 'Seçmeli Kimya', 'secmeli', 'Akademik Çalışmalar', { '11': 4, '12': 4 });
-    add('SBIY', 'Seçmeli Biyoloji', 'secmeli', 'Akademik Çalışmalar', { '11': 4, '12': 4 });
-    add('STDE', 'Seçmeli Türk Dili ve Edebiyatı', 'secmeli', 'Akademik Çalışmalar', { '11': [3, 5], '12': [3, 5] });
-    add('STAR', 'Seçmeli Tarih', 'secmeli', 'Akademik Çalışmalar', { '11': [2, 4], '12': [2, 4] });
-    add('SCOG', 'Seçmeli Coğrafya', 'secmeli', 'Akademik Çalışmalar', { '11': [2, 4], '12': [2, 4] });
-    add('HTD', 'Hedef Temelli Destek Eğitimi', 'secmeli', 'Akademik Çalışmalar', { '12': [3, 4, 5, 6] });
-    add('AST', 'Astronomi ve Uzay Bilimleri', 'secmeli', 'İnsan, Toplum ve Bilim', { '9': [1, 2], '10': [1, 2], '11': [1, 2], '12': [1, 2] });
-    add('SBTY', 'Bilişim Teknolojileri ve Yazılım', 'secmeli', 'İnsan, Toplum ve Bilim', { '9': 1, '10': [1, 2, 3], '11': [1, 2, 3], '12': [1, 2, 3] });
-    add('PRJ', 'Proje Tasarımı ve Uygulamaları', 'secmeli', 'İnsan, Toplum ve Bilim', { '9': [2, 3, 4], '10': [2, 3, 4], '11': [2, 3, 4], '12': [2, 3, 4] });
-    add('SYD2', 'Seçmeli İkinci Yabancı Dil', 'secmeli', 'İnsan, Toplum ve Bilim', { '9': [1, 2, 4], '10': [1, 2, 4], '11': [1, 2, 4], '12': [1, 2, 4] });
-    add('KUR', "Kur'an-ı Kerim", 'secmeli', 'Din, Ahlak ve Değer', { '9': 2, '10': 2, '11': 2, '12': 2 });
-    add('PEY', 'Peygamberimizin Hayatı', 'secmeli', 'Din, Ahlak ve Değer', { '9': [1, 2], '10': [1, 2], '11': [1, 2], '12': [1, 2] });
-    add('ADB', 'Adabımuaşeret', 'secmeli', 'Kültür, Sanat ve Spor', { '9': 1, '10': 1 });
-    add('TSA', 'Türk Sosyal Hayatında Aile', 'secmeli', 'Kültür, Sanat ve Spor', { '9': [1, 2], '10': [1, 2], '11': [1, 2], '12': [1, 2] });
-    add('SPE', 'Spor Eğitimi', 'secmeli', 'Kültür, Sanat ve Spor', { '9': [1, 2, 3], '10': [1, 2, 3], '11': [1, 2], '12': [1, 2] });
-    add('SNE', 'Sanat Eğitimi', 'secmeli', 'Kültür, Sanat ve Spor', { '9': [1, 2, 3], '10': [1, 2, 3], '11': [1, 2], '12': [1, 2] });
-  } else if (schoolTypeId === 'aihl') {
-    add('HTDE', 'Hazırlık Türk Dili ve Edebiyatı', 'zorunlu', 'Ortak', { 'H': 3 });
-    add('TDE', 'Türk Dili ve Edebiyatı', 'zorunlu', 'Ortak', { '9': 5, '10': 5, '11': 5, '12': 5 });
-    add('TAR', 'Tarih', 'zorunlu', 'Ortak', { '9': 2, '10': 2, '11': 2 });
-    add('INK', 'T.C. İnkılap Tarihi', 'zorunlu', 'Ortak', { '12': 2 });
-    add('COG', 'Coğrafya', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-    add('HMAT', 'Hazırlık Matematik', 'zorunlu', 'Ortak', { 'H': 3 });
-    add('MAT', 'Matematik', 'zorunlu', 'Ortak', { '9': 6, '10': 6 });
-    add('FIZ', 'Fizik', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-    add('KIM', 'Kimya', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-    add('BIY', 'Biyoloji', 'zorunlu', 'Ortak', { '9': 2, '10': 2 });
-    add('FEL', 'Felsefe', 'zorunlu', 'Ortak', { '10': 2, '11': 2 });
-    add('YD1', 'Yabancı Dil', 'zorunlu', 'Ortak', { 'H': 20, '9': 5, '10': 2, '11': 2, '12': 2 });
-    add('BTY', 'Bilişim Teknolojileri', 'zorunlu', 'Ortak', { 'H': 3 });
-    add('BGS', 'Beden / Görsel / Müzik', 'zorunlu', 'Ortak', { 'H': 2, '9': 2, '10': 1, '11': 1 });
-    add('SGT', 'Sağlık Bilgisi ve Trafik', 'zorunlu', 'Ortak', { '9': 1 });
-    add('ARP', 'Arapça', 'zorunlu', 'Ortak', { '9': 4, '10': 3 });
-    add('YD2', 'İkinci Yabancı Dil', 'zorunlu', 'Ortak', { 'H': 4 });
-    add('REH', 'Rehberlik ve Yönlendirme', 'zorunlu', 'Ortak', { 'H': 1, '9': 1 });
-    add('KUR', "Kur'an-ı Kerim", 'meslek', 'Meslek', { 'H': 4, '9': 5, '10': 4, '11': 4, '12': 3 });
-    add('MARP', 'Mesleki Arapça', 'meslek', 'Meslek', { '11': 3, '12': 2 });
-    add('TDB', 'Temel Dinî Bilgiler', 'meslek', 'Meslek', { '9': 1 });
-    add('SIY', 'Siyer', 'meslek', 'Meslek', { '10': 2 });
-    add('FIK', 'Fıkıh', 'meslek', 'Meslek', { '10': 2 });
-    add('TEF', 'Tefsir', 'meslek', 'Meslek', { '11': 2 });
-    add('DIN', 'Dinler Tarihi', 'meslek', 'Meslek', { '12': 1 });
-    add('HAD', 'Hadis', 'meslek', 'Meslek', { '10': 2 });
-    add('AKA', 'Akaid', 'meslek', 'Meslek', { '11': 1 });
-    add('KEL', 'Kelam', 'meslek', 'Meslek', { '12': 2 });
-    add('HIT', 'Hitabet ve Mesleki Uygulama', 'meslek', 'Meslek', { '11': 2 });
-    add('IKM', 'İslam Kültür ve Medeniyeti', 'meslek', 'Meslek', { '12': 2 });
-    add('OSM', 'Osmanlı Türkçesi', 'meslek', 'Meslek', { '10': 1 });
-    add('SMAT', 'Seçmeli Matematik', 'secmeli', 'A Grubu Seçmeli', { '11': [2, 4, 6], '12': [2, 4, 6] });
-    add('SFIZ', 'Seçmeli Fizik', 'secmeli', 'A Grubu Seçmeli', { '11': [2, 4], '12': [2, 4] });
-    add('SKIM', 'Seçmeli Kimya', 'secmeli', 'A Grubu Seçmeli', { '11': [2, 4], '12': [2, 4] });
-    add('SBIY', 'Seçmeli Biyoloji', 'secmeli', 'A Grubu Seçmeli', { '11': [2, 4], '12': [2, 4] });
-    add('STDE', 'Seçmeli Edebiyat', 'secmeli', 'A Grubu Seçmeli', { '11': [2, 3, 5], '12': [2, 3, 5] });
-    add('DMUS', 'Dinî Musiki', 'secmeli', 'A Grubu Seçmeli', { '11': [1, 2], '12': [1, 2] });
-  }
-  return list;
-}
+/* getMebTemplatesForGrade() meb_curriculum.js dosyasından yüklenir. */
 
 /* =========================================================================
    3. 7 MENÜ YAPISI
@@ -477,6 +100,10 @@ function buildDefaultSlots(schoolTypeId, periodsPerDay, activeDays, ihoMode = '3
   }
   if (schoolTypeId === 'iho' && ihoMode === '27' && periodsPerDay === 6) {
     slots[2][5] = 'BLOCKED'; slots[3][5] = 'BLOCKED'; slots[4][5] = 'BLOCKED';
+  }
+  const meta = MEB_SCHOOL_TYPES[schoolTypeId];
+  if (meta && meta.defaultTargetHours === 43 && periodsPerDay === 9) {
+    slots[3][8] = 'BLOCKED'; slots[4][8] = 'BLOCKED';
   }
   return slots;
 }
@@ -778,14 +405,16 @@ function evaluateClass(cls) {
   const extHours = ext.reduce((s, c) => s + (Number(c.hours) || 0), 0);
   const totalHours = mandHours + elecHours + extHours;
   const targetTotal = state.school.schoolTypeId === 'iho' ? getTargetWeeklyHours() : gradeObj.total;
-  const targetElective = state.school.schoolTypeId === 'ilkokul' ? 0 : (gradeObj.elective || 0);
+  const isPrimarySchool = state.school.schoolTypeId === 'ilkokul' || state.school.schoolTypeId === 'muzik_ilkokul';
+  const targetElective = isPrimarySchool ? 0 : (gradeObj.elective || 0);
   const totalBlocks = courses.reduce((s, c) => s + getCourseBlocks(c).length, 0);
 
   const issues = [];
   if (totalHours < targetTotal) issues.push(`Haftalık hedefe ${targetTotal - totalHours} saat eksik (${totalHours}/${targetTotal} sa)`);
   else if (totalHours > targetTotal) issues.push(`Haftalık hedeften ${totalHours - targetTotal} saat fazla (${totalHours}/${targetTotal} sa)`);
 
-  if (targetElective > 0 && elec.length > 0 && state.school.schoolTypeId === 'ortaokul') {
+  const isThreeGroupMiddle = state.school.schoolTypeId === 'ortaokul' || state.school.schoolTypeId === 'muzik_ortaokul' || state.school.schoolTypeId === 'spor_ortaokul';
+  if (targetElective > 0 && elec.length > 0 && isThreeGroupMiddle) {
     const grps = new Set(elec.map((c) => c.group).filter(Boolean));
     const req = ['İnsan, Toplum ve Bilim', 'Din, Ahlak ve Değer', 'Kültür, Sanat ve Spor'];
     const miss = req.filter((g) => !grps.has(g));
@@ -1055,12 +684,34 @@ function renderMenu1() {
   document.getElementById('kpiGridDims').textContent = `${isDouble ? 'İkili' : 'Tekli'} · ${stats.activeDayIndices.length} gün × ${state.grid.periodsPerDay} ders`;
 
   const stGrid = document.getElementById('schoolTypeGrid');
-  stGrid.innerHTML = Object.values(MEB_SCHOOL_TYPES).map((t) => {
-    const act = t.id === state.school.schoolTypeId;
-    return `<button type="button" data-school-type="${t.id}" class="school-type-btn text-left p-3 rounded-xl border transition flex items-start justify-between gap-2 ${act ? 'border-indigo-600 bg-indigo-50/70 ring-1 ring-indigo-600' : 'border-slate-200 bg-white hover:bg-slate-50'}">
-      <div class="min-w-0"><div class="text-xs font-bold ${act ? 'text-indigo-900' : 'text-slate-800'} truncate">${t.name}</div><div class="text-[11px] text-slate-500 mt-0.5">${t.decision}</div></div>
-      <span class="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-md ${act ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}">${t.defaultTargetHours} sa</span>
-    </button>`;
+  const groups = (typeof MEB_SCHOOL_GROUPS !== 'undefined' && Array.isArray(MEB_SCHOOL_GROUPS))
+    ? MEB_SCHOOL_GROUPS
+    : [{ id: 'all', title: 'Okul Türleri', subtitle: '', schoolIds: Object.keys(MEB_SCHOOL_TYPES) }];
+
+  stGrid.innerHTML = groups.map((grp) => {
+    const cards = grp.schoolIds
+      .map((id) => MEB_SCHOOL_TYPES[id])
+      .filter(Boolean)
+      .map((t) => {
+        const act = t.id === state.school.schoolTypeId;
+        return `<button type="button" data-school-type="${t.id}" class="school-type-btn text-left p-2.5 rounded-xl border transition flex items-start justify-between gap-2 ${act ? 'border-indigo-600 bg-indigo-50/80 ring-1 ring-indigo-600 shadow-xs' : 'border-slate-200 bg-white hover:bg-slate-50'}">
+          <div class="min-w-0">
+            <div class="text-xs font-bold ${act ? 'text-indigo-900' : 'text-slate-800'} leading-snug">${t.name}</div>
+            <div class="text-[10px] text-slate-500 mt-0.5 truncate">${t.decision}</div>
+          </div>
+          <span class="shrink-0 text-[10px] font-extrabold px-2 py-0.5 rounded-md ${act ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}">${t.defaultTargetHours} sa</span>
+        </button>`;
+      }).join('');
+    const hasActiveInGroup = grp.schoolIds.includes(state.school.schoolTypeId);
+    return `
+      <div class="rounded-xl border ${hasActiveInGroup ? 'border-indigo-200 bg-indigo-50/20' : 'border-slate-200/80 bg-slate-50/40'} p-2.5 space-y-2">
+        <div class="flex flex-wrap items-center justify-between gap-1 px-0.5">
+          <div class="text-[11px] font-extrabold ${hasActiveInGroup ? 'text-indigo-900' : 'text-slate-700'}">${grp.title}</div>
+          ${grp.subtitle ? `<div class="text-[10px] text-slate-400 font-medium">${grp.subtitle}</div>` : ''}
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${cards}</div>
+      </div>
+    `;
   }).join('');
   stGrid.querySelectorAll('.school-type-btn').forEach((b) => b.addEventListener('click', () => {
     if (b.dataset.schoolType !== state.school.schoolTypeId) {
@@ -1080,7 +731,9 @@ function renderMenu1() {
     box.querySelectorAll('.iho-mode-btn').forEach((b) => b.addEventListener('click', () => applySchoolTypeDefaults('iho', b.dataset.ihoMode)));
   } else { box.classList.add('hidden'); box.innerHTML = ''; }
 
-  document.getElementById('thExtraCol').classList.toggle('hidden', !meta.hasMeslekCol);
+  const thExtra = document.getElementById('thExtraCol');
+  thExtra.classList.toggle('hidden', !meta.hasMeslekCol);
+  if (meta.hasMeslekCol) thExtra.textContent = meta.extraColLabel || 'Meslek';
   const tOvr = state.school.schoolTypeId === 'iho' ? target : null;
   document.getElementById('mebSummaryTbody').innerHTML = grades.map((g) => `<tr>
     <td class="py-2 pr-1.5 font-semibold text-slate-800 whitespace-nowrap">${g.grade}</td>
